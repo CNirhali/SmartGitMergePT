@@ -1,25 +1,429 @@
-# SmartGitMergePT
+# SmartGitMergePT with Agentic AI Tracking
 
-## Overview
-SmartGitMergePT is an LLM-powered tool that predicts, detects, and resolves Git merge conflicts for teams with many contributors. It scans codebases, predicts potential conflicts before they occur, and uses a large language model to suggest or auto-resolve conflicts, improving collaboration and reducing merge pain.
+An intelligent Git merge conflict resolver and predictor with **Agentic AI Developer Tracking** for automated project management and time estimation.
 
-## Features
-- **Conflict Prediction:** Scans branches and PRs to predict likely merge conflicts early.
-- **Conflict Detection:** Detects actual conflicts during merges.
-- **LLM-based Resolution:** Uses an LLM to suggest or auto-resolve merge conflicts.
-- **Team Dashboard/CLI:** Shows predicted and actual conflicts for all contributors.
-- **Demo & Test Suite:** Includes scripts to simulate repo conflicts and automated tests.
+## 🚀 Features
 
-## Getting Started
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run the demo: `bash demo/repo_simulation.sh`
-3. Use the CLI: `python src/main.py --help`
+### Core Git Features
+- **Conflict Prediction**: Predict potential merge conflicts between branches
+- **Conflict Detection**: Detect actual merge conflicts in real-time
+- **LLM Resolution**: Resolve conflicts using AI-powered analysis
+- **Team Dashboard**: Visualize team conflict patterns
 
-## Demo
-- The `demo/` folder contains scripts and scenarios to simulate real-world repo conflicts with multiple contributors.
+### 🎯 Agentic AI Tracking System
+- **Automated Data Acquisition**: Screen recording, webcam monitoring, activity tracking
+- **AI-Powered Validation**: Cross-check and verify work details using AI
+- **Developer Tracking**: Monitor Alice working on feature branch A (and other developers)
+- **Project Estimates**: Automated time estimation and project completion predictions
+- **Privacy Controls**: Configurable privacy settings and data retention
+- **Real-time Monitoring**: Continuous tracking with validation
 
-## Testing
-- Run tests with: `pytest src/tests/`
+## 🏗️ Architecture
 
-## License
-MIT
+```
+SmartGitMergePT/
+├── src/
+│   ├── agentic_tracker.py      # Main tracking system
+│   ├── ai_validator.py         # AI validation engine
+│   ├── config_manager.py       # Configuration management
+│   ├── agentic_demo.py         # Comprehensive demo
+│   ├── main.py                 # CLI interface
+│   ├── git_utils.py            # Git operations
+│   ├── predictor.py            # Conflict prediction
+│   ├── llm_resolver.py         # Conflict resolution
+│   └── dashboard.py            # Team dashboard
+├── demo/                       # Demo scenarios
+├── requirements.txt            # Dependencies
+└── README.md                  # This file
+```
+
+## 🛠️ Installation
+
+### Prerequisites
+- Python 3.8+
+- Git
+- Webcam (for face recognition)
+- OpenAI API key (for AI validation) OR Ollama (for local LLM)
+
+### Setup
+
+1. **Clone the repository**:
+```bash
+git clone <repository-url>
+cd SmartGitMergePT
+```
+
+2. **Install dependencies**:
+```bash
+pip install -r requirements.txt
+```
+
+3. **Set up LLM (choose one)**:
+   
+   **Option A: Local Ollama (Recommended)**
+   ```bash
+   # Install Ollama
+   curl -fsSL https://ollama.ai/install.sh | sh
+   
+   # Start Ollama server
+   ollama serve
+   
+   # Pull Mistral model
+   ollama pull mistral
+   ```
+   
+   **Option B: OpenAI (Cloud-based)**
+   ```bash
+   export OPENAI_API_KEY="your-openai-api-key"
+   ```
+
+4. **Configure tracking** (optional):
+```bash
+python src/main.py config
+```
+
+## 🎮 Usage
+
+### Basic Git Operations
+
+**Predict conflicts**:
+```bash
+python src/main.py predict
+```
+
+**Detect conflicts**:
+```bash
+python src/main.py detect
+```
+
+**Resolve conflicts**:
+```bash
+python src/main.py resolve
+```
+
+**Show dashboard**:
+```bash
+python src/main.py dashboard
+```
+
+### Agentic AI Tracking
+
+**Start tracking a developer**:
+```bash
+python src/main.py track
+```
+
+**Stop tracking**:
+```bash
+python src/main.py stop-track
+```
+
+**Validate session data**:
+```bash
+python src/main.py validate
+```
+
+**Generate project estimates**:
+```bash
+python src/main.py estimates
+```
+
+**Show developer statistics**:
+```bash
+python src/main.py stats
+```
+
+**Manage configuration**:
+```bash
+python src/main.py config
+```
+
+**Run comprehensive demo**:
+```bash
+python src/main.py demo
+```
+
+## 🤖 Agentic AI Tracking System
+
+### How It Works
+
+The agentic AI tracking system autonomously monitors developer work and provides intelligent insights:
+
+1. **Data Acquisition**:
+   - Screen recording and analysis
+   - Webcam monitoring with face recognition
+   - Keyboard and mouse activity tracking
+   - Git activity correlation
+
+2. **AI Validation**:
+   - Cross-reference with git commits
+   - Temporal consistency checks
+   - Activity pattern validation
+   - Anomaly detection
+   - AI-powered content analysis
+
+3. **Project Intelligence**:
+   - Automated time estimation
+   - Project completion predictions
+   - Developer productivity analysis
+   - Data quality assessment
+
+### Example: Alice Working on Feature Branch A
+
+```python
+# Alice starts working on feature/user-authentication
+tracker = AgenticTracker(repo_path)
+tracker.start_tracking("alice_dev_001", "feature/user-authentication")
+
+# System automatically:
+# - Records screen activity
+# - Monitors webcam for face detection
+# - Tracks keyboard/mouse activity
+# - Correlates with git commits
+# - Validates work patterns with AI
+
+# Generate estimates
+estimates = tracker.get_project_estimates("feature/user-authentication")
+print(f"Estimated completion: {estimates['estimated_completion_hours']:.2f} hours")
+```
+
+### Privacy and Security
+
+The system includes comprehensive privacy controls:
+
+- **Data Encryption**: Optional encryption of sensitive data
+- **Face Blurring**: Automatic face blurring in stored images
+- **Data Retention**: Configurable retention periods
+- **Anonymization**: Optional data anonymization
+- **Local Storage**: All data stored locally by default
+
+## 📊 Configuration Options
+
+### LLM Configuration
+- **Provider**: `ollama` (local), `openai` (cloud), or `mistral` (legacy)
+- **Ollama Endpoint**: `http://localhost:11434/v1/chat/completions`
+- **Ollama Model**: `mistral` (default), `llama2`, `codellama`, etc.
+- **Validation Confidence Thresholds**: Configurable confidence levels
+
+### Tracking Configuration
+- Screenshot interval (15-300 seconds)
+- Webcam monitoring frequency
+- Activity confidence thresholds
+- Validation intervals
+
+### Privacy Configuration
+- Data retention periods
+- Encryption settings
+- Face blurring options
+- Anonymization controls
+
+### AI Validation Configuration
+- Validation confidence thresholds
+- Cross-reference settings
+- Anomaly detection sensitivity
+- Temporal consistency checks
+
+### Preset Configurations
+
+**Privacy-Compliant**:
+```bash
+python src/main.py config
+# Choose option 2: Create privacy-compliant config
+```
+
+**Performance-Optimized**:
+```bash
+python src/main.py config
+# Choose option 3: Create performance-optimized config
+```
+
+**High-Accuracy**:
+```bash
+python src/main.py config
+# Choose option 4: Create high-accuracy config
+```
+
+**Configure LLM**:
+```bash
+python src/main.py config
+# Choose option 5: Configure LLM settings
+# Select Ollama (option 1) for local LLM
+```
+
+## 🔧 Advanced Usage
+
+### Custom Configuration
+
+Create custom tracking configurations:
+
+```python
+from src.config_manager import ConfigManager
+
+config_manager = ConfigManager(repo_path)
+
+# Update LLM settings for Ollama
+config_manager.update_llm_config(
+    provider='ollama',
+    ollama_endpoint='http://localhost:11434/v1/chat/completions',
+    ollama_model='mistral'
+)
+
+# Update tracking settings
+config_manager.update_tracking_config(
+    screenshot_interval=60,
+    webcam_interval=30,
+    activity_threshold=0.8
+)
+
+# Update privacy settings
+config_manager.update_privacy_config(
+    store_screenshots=False,
+    encrypt_data=True,
+    data_retention_days=7
+)
+```
+
+### Direct API Usage
+
+```python
+from src.agentic_tracker import AgenticTracker
+from src.ai_validator import AIValidator
+
+# Initialize tracking
+tracker = AgenticTracker(repo_path)
+
+# Register developer
+tracker.register_developer("alice_dev_001", "Alice Johnson", "alice_face.jpg")
+
+# Start tracking
+tracker.start_tracking("alice_dev_001", "feature/user-authentication")
+
+# Get statistics
+stats = tracker.get_developer_stats("alice_dev_001", days=7)
+print(f"Total hours: {stats['total_hours']:.2f}")
+
+# Get project estimates
+estimates = tracker.get_project_estimates("feature/user-authentication")
+print(f"Estimated completion: {estimates['estimated_completion_hours']:.2f} hours")
+```
+
+### AI Validation
+
+```python
+from src.ai_validator import AIValidator
+
+validator = AIValidator(openai_api_key, repo_path)
+
+# Validate session data
+validation_result = validator.validate_work_session(session_data)
+
+if validation_result.is_valid:
+    print("✅ Session validated successfully")
+else:
+    print("❌ Validation issues found:")
+    for issue in validation_result.issues:
+        print(f"   • {issue}")
+```
+
+## 📈 Demo Scenarios
+
+### Alice's Work Session Demo
+
+Run the comprehensive demo showing Alice working on feature branch A:
+
+```bash
+python src/main.py demo
+```
+
+This demo includes:
+- Alice registration with face recognition
+- Simulated work session with multiple activities
+- AI validation of session data
+- Project estimate generation
+- Developer statistics analysis
+
+### Custom Demo
+
+```python
+from src.agentic_demo import AgenticDemo
+
+demo = AgenticDemo(repo_path, openai_api_key)
+results = demo.run_comprehensive_demo()
+
+print(f"Session duration: {results['session_data']['duration_minutes']:.1f} minutes")
+print(f"Validation passed: {results['validation_result'].is_valid}")
+```
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Ollama not detected**:
+- Install Ollama: `curl -fsSL https://ollama.ai/install.sh | sh`
+- Start server: `ollama serve`
+- Pull model: `ollama pull mistral`
+- Test connection: `curl http://localhost:11434/v1/chat/completions`
+
+**Webcam not detected**:
+- Check webcam permissions
+- Ensure webcam is not in use by other applications
+- Try different webcam index in configuration
+
+**AI validation fails**:
+- For Ollama: Check if `ollama serve` is running
+- For OpenAI: Verify API key is set
+- Check internet connectivity
+- Review API usage limits
+
+**Tracking stops unexpectedly**:
+- Check system resources
+- Verify database permissions
+- Review log files in tracking_data/
+
+### Debug Mode
+
+Enable detailed logging:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+### Data Recovery
+
+Session data is stored in SQLite database:
+```bash
+sqlite3 .smartgit_tracker.db
+.tables
+SELECT * FROM work_sessions;
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- OpenAI for AI validation capabilities
+- OpenCV for computer vision features
+- MediaPipe for face detection
+- GitPython for Git integration
+
+## 📞 Support
+
+For questions and support:
+- Create an issue on GitHub
+- Check the documentation
+- Review the demo scenarios
+
+---
+
+**Note**: This system includes advanced tracking capabilities. Ensure compliance with local privacy laws and obtain necessary consent before deploying in production environments.
