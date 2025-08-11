@@ -1,9 +1,20 @@
 import argparse
 import os
 import sys
+import logging
 from git_utils import GitUtils
 from predictor import ConflictPredictor
 from llm_resolver import resolve_conflict_with_mistral
+
+# Import guardrails and optimization systems
+try:
+    from guardrails import GuardrailsManager, with_guardrails, secure_function, resource_guard
+    from optimizer import PerformanceOptimizer, CacheConfig, PerformanceConfig, performance_monitor
+    from monitor import SystemMonitor, create_monitor
+    GUARDRAILS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Guardrails and optimization modules not available: {e}")
+    GUARDRAILS_AVAILABLE = False
 
 # Import new agentic AI tracking modules
 try:
@@ -14,6 +25,24 @@ try:
 except ImportError as e:
     print(f"⚠️  Agentic AI modules not available: {e}")
     AGENTIC_AVAILABLE = False
+
+# Import code review modules
+try:
+    from code_reviewer import MistralCodeReviewer, ReviewConfig, run_pre_commit_review
+    from hook_installer import GitHookInstaller
+    CODE_REVIEW_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Code review modules not available: {e}")
+    CODE_REVIEW_AVAILABLE = False
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Global instances
+guardrails_manager = None
+performance_optimizer = None
+system_monitor = None
 
 def main():
     parser = argparse.ArgumentParser(description='SmartGitMergePT: LLM-based Git merge conflict resolver and predictor with Agentic AI tracking')
@@ -35,8 +64,36 @@ def main():
         subparsers.add_parser('config', help='Manage agentic AI tracking configuration')
         subparsers.add_parser('demo', help='Run comprehensive agentic AI demo')
 
+    # New guardrails and optimization commands
+    if GUARDRAILS_AVAILABLE:
+        subparsers.add_parser('monitor', help='Start system monitoring')
+        subparsers.add_parser('health', help='Run health checks')
+        subparsers.add_parser('optimize', help='Run system optimization')
+        subparsers.add_parser('guardrails', help='Show guardrails status')
+        subparsers.add_parser('performance', help='Show performance metrics')
+
+    # New code review commands
+    if CODE_REVIEW_AVAILABLE:
+        subparsers.add_parser('review', help='Review staged changes with Mistral')
+        subparsers.add_parser('review-file', help='Review a specific file')
+        subparsers.add_parser('install-hook', help='Install pre-commit hook for code review')
+        subparsers.add_parser('uninstall-hook', help='Remove pre-commit hook')
+        subparsers.add_parser('test-hook', help='Test the installed pre-commit hook')
+        subparsers.add_parser('check-ollama', help='Check Ollama status for code review')
+
     args = parser.parse_args()
     repo_path = "demo/conflict_scenarios/demo-repo"
+    
+    # Initialize guardrails and optimization systems
+    global guardrails_manager, performance_optimizer, system_monitor
+    if GUARDRAILS_AVAILABLE:
+        guardrails_manager = GuardrailsManager()
+        cache_config = CacheConfig()
+        perf_config = PerformanceConfig()
+        performance_optimizer = PerformanceOptimizer(cache_config, perf_config)
+        system_monitor = create_monitor(repo_path)
+        logger.info("✅ Guardrails and optimization systems initialized")
+    
     git_utils = GitUtils(repo_path)
     predictor = ConflictPredictor(repo_path)
 
@@ -101,6 +158,41 @@ def main():
 
     elif args.command == 'demo' and AGENTIC_AVAILABLE:
         run_agentic_demo(repo_path)
+
+    # New guardrails and optimization commands
+    elif args.command == 'monitor' and GUARDRAILS_AVAILABLE:
+        start_system_monitoring(repo_path)
+
+    elif args.command == 'health' and GUARDRAILS_AVAILABLE:
+        run_health_checks(repo_path)
+
+    elif args.command == 'optimize' and GUARDRAILS_AVAILABLE:
+        run_system_optimization(repo_path)
+
+    elif args.command == 'guardrails' and GUARDRAILS_AVAILABLE:
+        show_guardrails_status()
+
+    elif args.command == 'performance' and GUARDRAILS_AVAILABLE:
+        show_performance_metrics()
+
+    # New code review commands
+    elif args.command == 'review' and CODE_REVIEW_AVAILABLE:
+        review_staged_changes(repo_path)
+
+    elif args.command == 'review-file' and CODE_REVIEW_AVAILABLE:
+        review_specific_file(repo_path)
+
+    elif args.command == 'install-hook' and CODE_REVIEW_AVAILABLE:
+        install_pre_commit_hook(repo_path)
+
+    elif args.command == 'uninstall-hook' and CODE_REVIEW_AVAILABLE:
+        uninstall_pre_commit_hook(repo_path)
+
+    elif args.command == 'test-hook' and CODE_REVIEW_AVAILABLE:
+        test_pre_commit_hook(repo_path)
+
+    elif args.command == 'check-ollama' and CODE_REVIEW_AVAILABLE:
+        check_ollama_status()
 
     else:
         parser.print_help()
@@ -481,6 +573,210 @@ def run_agentic_demo(repo_path: str):
         print("❌ Agentic demo module not available")
     except Exception as e:
         print(f"❌ Demo failed: {e}")
+
+# Guardrails and optimization functions
+def start_system_monitoring(repo_path: str):
+    """Start system monitoring"""
+    print("🔍 Starting system monitoring...")
+    
+    try:
+        import asyncio
+        from monitor import LiveMonitor
+        
+        monitor = create_monitor(repo_path)
+        monitor.start_monitoring()
+        
+        print("✅ System monitoring started")
+        print("📊 Press Ctrl+C to stop monitoring")
+        
+        # Start live monitoring
+        live_monitor = LiveMonitor(monitor)
+        asyncio.run(live_monitor.start_live_display())
+        
+    except KeyboardInterrupt:
+        print("\n⏹️  Stopping monitoring...")
+        monitor.stop_monitoring()
+        print("✅ Monitoring stopped")
+    except Exception as e:
+        print(f"❌ Monitoring failed: {e}")
+
+def run_health_checks(repo_path: str):
+    """Run health checks"""
+    print("🏥 Running health checks...")
+    
+    try:
+        import asyncio
+        
+        monitor = create_monitor(repo_path)
+        results = asyncio.run(monitor.run_health_checks())
+        
+        print("✅ Health checks completed")
+        monitor.display_status()
+        
+    except Exception as e:
+        print(f"❌ Health checks failed: {e}")
+
+def run_system_optimization(repo_path: str):
+    """Run system optimization"""
+    print("⚡ Running system optimization...")
+    
+    try:
+        global performance_optimizer
+        
+        if performance_optimizer:
+            performance_optimizer.optimize_system()
+            stats = performance_optimizer.get_performance_stats()
+            
+            print("✅ System optimization completed")
+            print(f"📊 Cache hit rate: {stats['cache']['hit_rate']:.2f}%")
+            print(f"💾 Memory optimizations: {stats['optimizations']['memory_optimizations']}")
+            
+        else:
+            print("❌ Performance optimizer not available")
+            
+    except Exception as e:
+        print(f"❌ Optimization failed: {e}")
+
+def show_guardrails_status():
+    """Show guardrails status"""
+    print("🛡️  Guardrails Status")
+    
+    try:
+        global guardrails_manager
+        
+        if guardrails_manager:
+            health_status = guardrails_manager.get_health_status()
+            
+            print(f"Overall Health: {'✅ Healthy' if health_status['overall_health'] else '❌ Unhealthy'}")
+            print(f"Performance: {'✅ Healthy' if health_status['performance']['healthy'] else '❌ Unhealthy'}")
+            print(f"Security Events (24h): {health_status['security']['total_events_24h']}")
+            print(f"Critical Events: {health_status['security']['critical_events']}")
+            print(f"Total Errors: {health_status['errors']['total_errors']}")
+            
+        else:
+            print("❌ Guardrails manager not available")
+            
+    except Exception as e:
+        print(f"❌ Failed to get guardrails status: {e}")
+
+def show_performance_metrics():
+    """Show performance metrics"""
+    print("📊 Performance Metrics")
+    
+    try:
+        global performance_optimizer
+        
+        if performance_optimizer:
+            stats = performance_optimizer.get_performance_stats()
+            
+            print(f"Cache Hit Rate: {stats['cache']['hit_rate']:.2f}%")
+            print(f"Cache Size: {stats['cache']['size']} items")
+            print(f"Memory Usage: {stats['resources']['memory']['usage_mb']:.1f} MB")
+            print(f"CPU Usage: {stats['resources']['cpu']['usage_percent']:.1f}%")
+            print(f"Async Operations: {stats['optimizations']['async_operations']}")
+            print(f"Memory Optimizations: {stats['optimizations']['memory_optimizations']}")
+            
+        else:
+            print("❌ Performance optimizer not available")
+            
+    except Exception as e:
+        print(f"❌ Failed to get performance metrics: {e}")
+
+# Code Review Functions
+def review_staged_changes(repo_path: str):
+    """Review staged changes with Mistral"""
+    print("🔍 Reviewing staged changes with Mistral...")
+    
+    try:
+        success = run_pre_commit_review(repo_path)
+        if success:
+            print("✅ Code review completed successfully")
+        else:
+            print("❌ Code review found issues")
+            sys.exit(1)
+    except Exception as e:
+        print(f"❌ Code review failed: {e}")
+        sys.exit(1)
+
+def review_specific_file(repo_path: str):
+    """Review a specific file"""
+    print("🔍 Reviewing specific file with Mistral...")
+    
+    try:
+        file_path = input("Enter file path to review: ").strip()
+        if not file_path:
+            print("❌ No file path provided")
+            return
+        
+        reviewer = MistralCodeReviewer(repo_path)
+        result = reviewer.review_file(file_path)
+        
+        print("\n" + reviewer.generate_report([result]))
+        
+    except Exception as e:
+        print(f"❌ File review failed: {e}")
+
+def install_pre_commit_hook(repo_path: str):
+    """Install pre-commit hook for code review"""
+    print("🔧 Installing pre-commit hook for Mistral code review...")
+    
+    try:
+        installer = GitHookInstaller(repo_path)
+        
+        if installer.install_pre_commit_hook():
+            print("✅ Pre-commit hook installed successfully")
+            print("🔍 Code review will now run automatically before each commit")
+        else:
+            print("❌ Failed to install pre-commit hook")
+            
+    except Exception as e:
+        print(f"❌ Hook installation failed: {e}")
+
+def uninstall_pre_commit_hook(repo_path: str):
+    """Remove pre-commit hook"""
+    print("🔧 Removing pre-commit hook...")
+    
+    try:
+        installer = GitHookInstaller(repo_path)
+        
+        if installer.uninstall_pre_commit_hook():
+            print("✅ Pre-commit hook removed successfully")
+        else:
+            print("❌ Failed to remove pre-commit hook")
+            
+    except Exception as e:
+        print(f"❌ Hook removal failed: {e}")
+
+def test_pre_commit_hook(repo_path: str):
+    """Test the installed pre-commit hook"""
+    print("🧪 Testing pre-commit hook...")
+    
+    try:
+        installer = GitHookInstaller(repo_path)
+        
+        if installer.test_hook():
+            print("✅ Pre-commit hook test completed")
+        else:
+            print("❌ Pre-commit hook test failed")
+            
+    except Exception as e:
+        print(f"❌ Hook test failed: {e}")
+
+def check_ollama_status():
+    """Check Ollama status for code review"""
+    print("🔍 Checking Ollama status for code review...")
+    
+    try:
+        installer = GitHookInstaller()
+        
+        if installer.check_ollama_status():
+            print("✅ Ollama is ready for code review")
+        else:
+            print("❌ Ollama is not ready")
+            print("Please ensure Ollama is running and Mistral model is available")
+            
+    except Exception as e:
+        print(f"❌ Ollama status check failed: {e}")
 
 if __name__ == '__main__':
     main() 
