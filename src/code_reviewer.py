@@ -131,8 +131,15 @@ class MistralCodeReviewer:
     def _review_file(self, file_path: str) -> CodeReviewResult:
         """Review a single file"""
         try:
-            # Get file content
-            full_path = os.path.join(self.repo_path, file_path)
+            # Get file content and validate path for security
+            abs_repo_path = os.path.abspath(self.repo_path)
+            full_path = os.path.abspath(os.path.join(abs_repo_path, file_path))
+
+            # Prevent path traversal
+            if os.path.commonpath([abs_repo_path, full_path]) != abs_repo_path:
+                logger.warning(f"Path traversal attempt detected: {file_path}")
+                return self._create_empty_result(file_path, "Error: Path traversal attempt detected")
+
             if not os.path.exists(full_path):
                 return self._create_empty_result(file_path, "File not found")
             

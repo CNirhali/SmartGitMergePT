@@ -13,6 +13,11 @@ def setup_demo_repo(tmp_path):
     file_path.write_text("base\n")
     repo.index.add([str(file_path)])
     repo.index.commit("init")
+    # Ensure current branch is 'main'
+    try:
+        repo.git.branch('-M', 'main')
+    except:
+        pass
     repo.git.checkout('-b', 'feature/a')
     file_path.write_text("base\na\n")
     repo.index.add([str(file_path)])
