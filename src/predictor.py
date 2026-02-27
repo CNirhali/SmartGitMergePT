@@ -8,10 +8,16 @@ class ConflictPredictor:
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
         predictions = []
+        base_branch = 'main'
+        if 'main' not in branches and 'master' in branches:
+            base_branch = 'master'
+
         for i, branch_a in enumerate(branches):
             for branch_b in branches[i+1:]:
-                diff_a = self.git_utils.get_diff_between_branches('main', branch_a)
-                diff_b = self.git_utils.get_diff_between_branches('main', branch_b)
+                if branch_a == base_branch or branch_b == base_branch:
+                    continue
+                diff_a = self.git_utils.get_diff_between_branches(base_branch, branch_a)
+                diff_b = self.git_utils.get_diff_between_branches(base_branch, branch_b)
                 files_a = set(self._extract_changed_files(diff_a))
                 files_b = set(self._extract_changed_files(diff_b))
                 overlap = files_a & files_b

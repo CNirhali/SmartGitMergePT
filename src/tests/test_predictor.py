@@ -17,7 +17,10 @@ def setup_demo_repo(tmp_path):
     file_path.write_text("base\na\n")
     repo.index.add([str(file_path)])
     repo.index.commit("a change")
-    repo.git.checkout('main')
+    try:
+        repo.git.checkout('main')
+    except git.exc.GitCommandError:
+        repo.git.checkout('master')
     repo.git.checkout('-b', 'feature/b')
     file_path.write_text("base\nb\n")
     repo.index.add([str(file_path)])

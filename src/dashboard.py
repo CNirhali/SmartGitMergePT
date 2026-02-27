@@ -7,8 +7,9 @@ app = Flask(__name__)
 
 template = '''
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>SmartGitMergePT Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 2em; }
@@ -16,10 +17,12 @@ template = '''
         th, td { border: 1px solid #ccc; padding: 8px; }
         th { background: #eee; }
         .present { color: green; font-weight: bold; }
-        .absent { color: #aaa; }
+        .absent { color: #767676; }
+        .refresh-btn { margin-bottom: 1em; padding: 5px 10px; cursor: pointer; }
     </style>
 </head>
 <body>
+    <button class="refresh-btn" onclick="window.location.reload()" aria-label="Refresh conflict predictions">Refresh</button>
     <h1>SmartGitMergePT Dashboard</h1>
     <h2>Branches</h2>
     <ul>
@@ -40,7 +43,7 @@ template = '''
         </li>
     </ul>
     <h2>Predicted Conflicts</h2>
-    <table>
+    <table aria-label="Predicted merge conflicts">
         <tr><th>Branches</th><th>Files</th><th>Line Overlap</th><th>Semantic Conflict</th></tr>
         {% for pred in predictions %}
         <tr>
