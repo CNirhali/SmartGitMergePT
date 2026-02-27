@@ -8,15 +8,30 @@ class ConflictPredictor:
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
         predictions = []
+        # Try to determine the default branch
+        try:
+            main_branch = self.git_utils.repo.active_branch.name
+        except:
+            main_branch = 'main'
+
+        # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch
+        # This reduces Git operations from O(N^2) to O(N) where N is number of branches
+        branch_data = {}
+        for branch in branches:
+            diff = self.git_utils.get_diff_between_branches(main_branch, branch)
+            branch_data[branch] = {
+                'diff': diff,
+                'files': set(self._extract_changed_files(diff))
+            }
+
         for i, branch_a in enumerate(branches):
+            data_a = branch_data[branch_a]
             for branch_b in branches[i+1:]:
-                diff_a = self.git_utils.get_diff_between_branches('main', branch_a)
-                diff_b = self.git_utils.get_diff_between_branches('main', branch_b)
-                files_a = set(self._extract_changed_files(diff_a))
-                files_b = set(self._extract_changed_files(diff_b))
-                overlap = files_a & files_b
-                line_conflicts = self._line_level_overlap(diff_a, diff_b)
-                semantic_conflict = self._semantic_similarity(diff_a, diff_b)
+                data_b = branch_data[branch_b]
+
+                overlap = data_a['files'] & data_b['files']
+                line_conflicts = self._line_level_overlap(data_a['diff'], data_b['diff'])
+                semantic_conflict = self._semantic_similarity(data_a['diff'], data_b['diff'])
                 if overlap or line_conflicts or semantic_conflict:
                     predictions.append({
                         'branches': (branch_a, branch_b),

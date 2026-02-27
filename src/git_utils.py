@@ -17,8 +17,14 @@ class GitUtils:
         try:
             self.repo.git.merge(source_branch, '--no-commit', '--no-ff')
             # If merge succeeds, abort to keep repo clean
-            self.repo.git.merge('--abort')
+            try:
+                self.repo.git.merge('--abort')
+            except:
+                pass
             return True, "No conflicts detected."
         except git.exc.GitCommandError as e:
-            self.repo.git.merge('--abort')
+            try:
+                self.repo.git.merge('--abort')
+            except:
+                pass
             return False, str(e) 
