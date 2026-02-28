@@ -17,7 +17,10 @@ def setup_demo_repo(tmp_path):
     file_path.write_text("base\na\n")
     repo.index.add([str(file_path)])
     repo.index.commit("a change")
-    repo.git.checkout('main')
+
+    # Use the active branch (likely master or main)
+    default_branch = repo.active_branch.name
+    repo.git.checkout(default_branch)
     repo.git.checkout('-b', 'feature/b')
     file_path.write_text("base\nb\n")
     repo.index.add([str(file_path)])

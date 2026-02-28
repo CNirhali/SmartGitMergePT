@@ -37,7 +37,7 @@ prometheus-client>=0.17.0
 asyncio-mqtt>=0.13.0
 
 # Data compression
-gzip
+# gzip (standard library)
 
 # Standard library modules (for reference)
 # threading

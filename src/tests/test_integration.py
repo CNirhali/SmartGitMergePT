@@ -7,16 +7,21 @@ def setup_demo_repo(tmp_path):
     repo_dir.mkdir()
     repo = git.Repo.init(str(repo_dir))
     file_path = repo_dir / "file.txt"
-    file_path.write_text("base\n")
+    file_path.write_text("line 1\nline 2\n")
     repo.index.add([str(file_path)])
     repo.index.commit("init")
+
     repo.git.checkout('-b', 'feature/a')
-    file_path.write_text("base\na\n")
+    file_path.write_text("line 1 changed in a\nline 2\n")
     repo.index.add([str(file_path)])
     repo.index.commit("a change")
-    repo.git.checkout('main')
+
+    # Use the active branch (likely master or main)
+    default_branch = 'master' if 'master' in [h.name for h in repo.heads] else 'main'
+    repo.git.checkout(default_branch)
     repo.git.checkout('-b', 'feature/b')
-    file_path.write_text("base\nb\n")
+    # Force a conflict by modifying the same line
+    file_path.write_text("line 1 changed in b\nline 2\n")
     repo.index.add([str(file_path)])
     repo.index.commit("b change")
     return str(repo_dir)
