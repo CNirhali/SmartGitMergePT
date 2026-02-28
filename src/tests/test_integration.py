@@ -7,19 +7,24 @@ def setup_demo_repo(tmp_path):
     repo_dir.mkdir()
     repo = git.Repo.init(str(repo_dir))
     file_path = repo_dir / "file.txt"
-    file_path.write_text("base\n")
+    file_path.write_text("line 1\nline 2\n")
     repo.index.add([str(file_path)])
     repo.index.commit("init")
+
     repo.git.checkout('-b', 'feature/a')
-    file_path.write_text("base\na\n")
+    file_path.write_text("line 1 changed in a\nline 2\n")
     repo.index.add([str(file_path)])
     repo.index.commit("a change")
+
+    # Use the active branch (likely master or main)
     try:
         repo.git.checkout('main')
-    except git.exc.GitCommandError:
+    except:
         repo.git.checkout('master')
+
     repo.git.checkout('-b', 'feature/b')
-    file_path.write_text("base\nb\n")
+    # Force a conflict by modifying the same line
+    file_path.write_text("line 1 changed in b\nline 2\n")
     repo.index.add([str(file_path)])
     repo.index.commit("b change")
     return str(repo_dir)
@@ -33,4 +38,4 @@ def test_integration_predict_and_detect(tmp_path):
     assert any(p['conflict_likely'] for p in predictions)
     # Simulate merge
     ok, msg = git_utils.simulate_merge('feature/a', 'feature/b')
-    assert not ok 
+    assert not ok

@@ -16,13 +16,13 @@ git checkout -b feature/alice
 echo "Alice's change" >> file.txt
 git commit -am "Alice edit"
 
-git checkout main
+git checkout master
 git checkout -b feature/bob
 
 echo "Bob's change" >> file.txt
 git commit -am "Bob edit"
 
-git checkout main
+git checkout master
 
 echo "[Demo] Created branches: feature/alice, feature/bob with conflicting changes in file.txt."
 echo "[Demo] To test, run:"

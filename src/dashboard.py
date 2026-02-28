@@ -16,6 +16,7 @@ template = '''
         table { border-collapse: collapse; width: 80%; }
         th, td { border: 1px solid #ccc; padding: 8px; }
         th { background: #eee; }
+        tr:hover { background-color: #f5f5f5; }
         .present { color: green; font-weight: bold; }
         .absent { color: #767676; }
         .refresh-btn { margin-bottom: 1em; padding: 5px 10px; cursor: pointer; }
@@ -73,8 +74,15 @@ def dashboard():
     }
     return render_template_string(template, branches=branches, predictions=predictions, scenario_types=scenario_types)
 
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+    return response
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SmartGitMergePT Dashboard')
     parser.add_argument('--port', type=int, default=5000, help='Port to run the dashboard on')
     args = parser.parse_args()
-    app.run(debug=True, port=args.port) 
+    app.run(debug=False, port=args.port)
