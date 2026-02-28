@@ -22,6 +22,8 @@ def setup_demo_repo(tmp_path):
     except:
         repo.git.checkout('master')
 
+    default_branch = 'master' if 'master' in [h.name for h in repo.heads] else 'main'
+    repo.git.checkout(default_branch)
     repo.git.checkout('-b', 'feature/b')
     # Force a conflict by modifying the same line
     file_path.write_text("line 1 changed in b\nline 2\n")
