@@ -13,12 +13,24 @@ class ConflictPredictor:
         try:
             main_branch = self.git_utils.repo.active_branch.name
         except:
+            # Fallback to checking for main/master in branches list
+            if 'main' in branches:
+                main_branch = 'main'
+            elif 'master' in branches:
+                main_branch = 'master'
+            else:
+                main_branch = 'main'
             main_branch = 'main'
 
         # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch
         # This reduces Git operations from O(N^2) to O(N) where N is number of branches
         branch_data = {}
         for branch in branches:
+            try:
+                diff = self.git_utils.get_diff_between_branches(main_branch, branch)
+            except:
+                # If we fail to get diff (e.g. branch is main_branch itself), use empty diff
+                diff = ""
             diff = self.git_utils.get_diff_between_branches(main_branch, branch)
             files, lines = self._get_diff_metadata(diff)
             branch_data[branch] = {
@@ -28,6 +40,12 @@ class ConflictPredictor:
             }
 
         for i, branch_a in enumerate(branches):
+            if branch_a == main_branch:
+                continue
+            data_a = branch_data[branch_a]
+            for branch_b in branches[i+1:]:
+                if branch_b == main_branch:
+                    continue
             data_a = branch_data[branch_a]
             for branch_b in branches[i+1:]:
                 data_b = branch_data[branch_b]
@@ -93,4 +111,5 @@ class ConflictPredictor:
         if seq.quick_ratio() < 0.7:
             return False
 
+        return seq.ratio() > 0.7
         return seq.ratio() > 0.7 

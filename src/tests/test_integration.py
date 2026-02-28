@@ -17,6 +17,11 @@ def setup_demo_repo(tmp_path):
     repo.index.commit("a change")
 
     # Use the active branch (likely master or main)
+    try:
+        repo.git.checkout('main')
+    except:
+        repo.git.checkout('master')
+
     default_branch = 'master' if 'master' in [h.name for h in repo.heads] else 'main'
     repo.git.checkout(default_branch)
     repo.git.checkout('-b', 'feature/b')
@@ -35,4 +40,4 @@ def test_integration_predict_and_detect(tmp_path):
     assert any(p['conflict_likely'] for p in predictions)
     # Simulate merge
     ok, msg = git_utils.simulate_merge('feature/a', 'feature/b')
-    assert not ok 
+    assert not ok

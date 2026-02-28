@@ -24,6 +24,11 @@ def setup_demo_repo(tmp_path):
     repo.index.commit("a change")
 
     # Use the active branch (likely master or main)
+    try:
+        repo.git.checkout('main')
+    except:
+        repo.git.checkout('master')
+
     default_branch = repo.active_branch.name
     repo.git.checkout(default_branch)
     repo.git.checkout('-b', 'feature/b')
@@ -38,4 +43,4 @@ def test_predictor_detects_conflict(tmp_path):
     git_utils = GitUtils(repo_path)
     branches = git_utils.list_branches()
     predictions = predictor.predict_conflicts(branches)
-    assert any(p['conflict_likely'] for p in predictions) 
+    assert any(p['conflict_likely'] for p in predictions)
