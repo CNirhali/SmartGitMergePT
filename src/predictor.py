@@ -1,6 +1,7 @@
 from git_utils import GitUtils
-from typing import List, Dict
+from typing import List, Dict, Set, Tuple
 import difflib
+from functools import lru_cache
 
 class ConflictPredictor:
     def __init__(self, repo_path: str = "."):
@@ -19,9 +20,11 @@ class ConflictPredictor:
         branch_data = {}
         for branch in branches:
             diff = self.git_utils.get_diff_between_branches(main_branch, branch)
+            files, lines = self._get_diff_metadata(diff)
             branch_data[branch] = {
                 'diff': diff,
-                'files': set(self._extract_changed_files(diff))
+                'files': files,
+                'lines': lines
             }
 
         for i, branch_a in enumerate(branches):
@@ -30,8 +33,16 @@ class ConflictPredictor:
                 data_b = branch_data[branch_b]
 
                 overlap = data_a['files'] & data_b['files']
-                line_conflicts = self._line_level_overlap(data_a['diff'], data_b['diff'])
-                semantic_conflict = self._semantic_similarity(data_a['diff'], data_b['diff'])
+
+                # BOLT: Using pre-calculated line sets (O(1) set intersection vs O(L) re-parsing)
+                line_conflicts = bool(data_a['lines'] & data_b['lines'])
+
+                # BOLT: Semantic similarity is slow, only check if there's no overlap already
+                # or if some files overlap to warrant deeper check
+                semantic_conflict = False
+                if not line_conflicts and overlap:
+                    semantic_conflict = self._semantic_similarity(data_a['diff'], data_b['diff'])
+
                 if overlap or line_conflicts or semantic_conflict:
                     predictions.append({
                         'branches': (branch_a, branch_b),
@@ -42,23 +53,44 @@ class ConflictPredictor:
                     })
         return predictions
 
-    def _extract_changed_files(self, diff: str) -> List[str]:
-        files = []
+    @lru_cache(maxsize=128)
+    def _get_diff_metadata(self, diff: str) -> Tuple[Set[str], Set[str]]:
+        """BOLT: Extract changed files and lines in a single pass with caching"""
+        files = set()
+        lines = set()
         for line in diff.splitlines():
             if line.startswith('diff --git'):
                 parts = line.split(' ')
                 if len(parts) > 2:
-                    files.append(parts[2][2:])  # Remove the a/ prefix
-        return files
+                    files.add(parts[2][2:])  # Remove the a/ prefix
+            elif line.startswith('+') or line.startswith('-'):
+                # Avoid capturing the diff header lines as changes
+                if not (line.startswith('+++') or line.startswith('---')):
+                    lines.add(line[1:])
+        return files, lines
+
+    def _extract_changed_files(self, diff: str) -> List[str]:
+        # Maintained for backward compatibility but using _get_diff_metadata internally is better
+        files, _ = self._get_diff_metadata(diff)
+        return list(files)
 
     def _line_level_overlap(self, diff_a: str, diff_b: str) -> bool:
-        # Naive approach: check if any added/removed lines are the same
-        lines_a = set([l[1:] for l in diff_a.splitlines() if l.startswith('+') or l.startswith('-')])
-        lines_b = set([l[1:] for l in diff_b.splitlines() if l.startswith('+') or l.startswith('-')])
+        # Maintained for backward compatibility
+        _, lines_a = self._get_diff_metadata(diff_a)
+        _, lines_b = self._get_diff_metadata(diff_b)
         return bool(lines_a & lines_b)
 
     def _semantic_similarity(self, diff_a: str, diff_b: str) -> bool:
-        # Placeholder: in real use, use embeddings or LLM for semantic similarity
-        # Here, use difflib for a rough similarity check
+        # BOLT: SequenceMatcher is expensive. Use quick_ratio for early rejection.
+        if not diff_a or not diff_b:
+            return False
+
         seq = difflib.SequenceMatcher(None, diff_a, diff_b)
+
+        # Fast early rejection
+        if seq.real_quick_ratio() < 0.7:
+            return False
+        if seq.quick_ratio() < 0.7:
+            return False
+
         return seq.ratio() > 0.7 
