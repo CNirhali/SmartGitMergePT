@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 template = '''
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>SmartGitMergePT Dashboard</title>
     <style>
@@ -15,8 +15,9 @@ template = '''
         table { border-collapse: collapse; width: 80%; }
         th, td { border: 1px solid #ccc; padding: 8px; }
         th { background: #eee; }
+        tr:hover { background-color: #f5f5f5; }
         .present { color: green; font-weight: bold; }
-        .absent { color: #aaa; }
+        .absent { color: #767676; }
     </style>
 </head>
 <body>
