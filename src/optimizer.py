@@ -10,7 +10,6 @@ import hashlib
 import json
 import logging
 import os
-import pickle
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict, OrderedDict
@@ -62,6 +61,20 @@ class PerformanceConfig:
     enable_compression: bool = True
     memory_limit_mb: int = 512
     cpu_limit_percent: int = 80
+
+class SmartJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle non-serializable objects like sets"""
+    def default(self, obj):
+        if isinstance(obj, set):
+            return {"__type__": "set", "data": list(obj)}
+        return super().default(obj)
+
+def smart_json_decoder(obj):
+    """Custom JSON decoder to reconstruct non-serializable objects"""
+    if isinstance(obj, dict) and "__type__" in obj:
+        if obj["__type__"] == "set":
+            return set(obj["data"])
+    return obj
 
 class SmartCache:
     """Intelligent caching system with multiple strategies"""
@@ -164,6 +177,8 @@ class SmartCache:
     
     def _compress_value(self, value: Any) -> Any:
         """Compress cache value"""
+        # Note: Current implementation is just a placeholder that hashes the data.
+        # This causes data loss and is a known bug to be addressed in optimizer.py
         if isinstance(value, str) and len(value) > 1000:
             # Simple compression for large strings
             return f"COMPRESSED:{hashlib.md5(value.encode()).hexdigest()}"
@@ -174,8 +189,8 @@ class SmartCache:
         try:
             cache_file = self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.cache"
             if cache_file.exists():
-                with open(cache_file, 'rb') as f:
-                    return pickle.load(f)
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    return json.load(f, object_hook=smart_json_decoder)
         except Exception as e:
             logger.error(f"Load from disk error: {e}")
         return None
@@ -184,8 +199,8 @@ class SmartCache:
         """Save value to disk cache"""
         try:
             cache_file = self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.cache"
-            with open(cache_file, 'wb') as f:
-                pickle.dump(value, f)
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(value, f, cls=SmartJSONEncoder)
         except Exception as e:
             logger.error(f"Save to disk error: {e}")
     
@@ -210,10 +225,10 @@ class SmartCache:
         """Load persistent cache on startup"""
         try:
             for cache_file in self.cache_dir.glob("*.cache"):
-                with open(cache_file, 'rb') as f:
+                with open(cache_file, 'r', encoding='utf-8') as f:
                     # We can't reconstruct the key, so we'll use filename as key
                     key = cache_file.stem
-                    self.cache[key] = pickle.load(f)
+                    self.cache[key] = json.load(f, object_hook=smart_json_decoder)
         except Exception as e:
             logger.error(f"Load persistent cache error: {e}")
 
@@ -543,19 +558,17 @@ def optimize_imports():
 def compress_data(data: Any) -> bytes:
     """Compress data for storage/transmission"""
     import gzip
-    import pickle
     
-    serialized = pickle.dumps(data)
+    serialized = json.dumps(data, cls=SmartJSONEncoder).encode('utf-8')
     compressed = gzip.compress(serialized)
     return compressed
 
 def decompress_data(compressed_data: bytes) -> Any:
     """Decompress data"""
     import gzip
-    import pickle
     
     decompressed = gzip.decompress(compressed_data)
-    return pickle.loads(decompressed)
+    return json.loads(decompressed.decode('utf-8'), object_hook=smart_json_decoder)
 
 def batch_process(items: List[Any], batch_size: int = 100) -> List[List[Any]]:
     """Split items into batches for processing"""
