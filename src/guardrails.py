@@ -37,6 +37,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SecurityLevel(Enum):
+    INFO = "info"
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -153,7 +154,7 @@ class InputValidator:
             normalized_base = os.path.normpath(base_path)
             
             # Check if path is within base directory
-            if not normalized_path.startswith(normalized_base):
+            if os.path.commonpath([os.path.abspath(normalized_base), os.path.abspath(normalized_path)]) != os.path.abspath(normalized_base):
                 return False, "Path traversal attempt detected"
             
             # Check for dangerous file extensions
@@ -388,10 +389,13 @@ class ErrorHandler:
         # Log error
         logger.error(f"Error in {context}: {error_type} - {error}")
         
+        # Determine which recovery strategy to use
+        strategy = recovery_strategy or self.recovery_strategies.get(error_type)
+
         # Try recovery strategy
-        if recovery_strategy:
+        if strategy:
             try:
-                return recovery_strategy(error, context)
+                return strategy(error, context)
             except Exception as recovery_error:
                 logger.error(f"Recovery strategy failed: {recovery_error}")
                 return False
