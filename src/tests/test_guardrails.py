@@ -39,14 +39,14 @@ class TestInputValidator:
         sensitive_string = "password=secret123"
         is_valid, result = self.validator.validate_string(sensitive_string)
         assert not is_valid
-        assert "sensitive data" in result
+        assert "Sensitive data" in result
     
     def test_validate_string_path_traversal(self):
         """Test path traversal detection"""
         malicious_string = "../../../etc/passwd"
         is_valid, result = self.validator.validate_string(malicious_string)
         assert not is_valid
-        assert "path traversal" in result
+        assert "Path traversal" in result
     
     def test_validate_string_sql_injection(self):
         """Test SQL injection detection"""
@@ -69,7 +69,7 @@ class TestInputValidator:
         malicious_path = "/safe/directory/../../../etc/passwd"
         is_valid, result = self.validator.validate_path(malicious_path, base_path)
         assert not is_valid
-        assert "path traversal" in result
+        assert "Path traversal" in result
     
     def test_validate_url_safe(self):
         """Test safe URL validation"""
@@ -83,7 +83,7 @@ class TestInputValidator:
         dangerous_url = "javascript:alert('xss')"
         is_valid, result = self.validator.validate_url(dangerous_url)
         assert not is_valid
-        assert "dangerous" in result
+        assert "Dangerous" in result
 
 class TestRateLimiter:
     """Test rate limiting functionality"""
