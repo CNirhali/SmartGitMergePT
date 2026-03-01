@@ -26,12 +26,14 @@ class ConflictPredictor:
         # This reduces Git operations from O(N^2) to O(N) where N is number of branches
         branch_data = {}
         for branch in branches:
-            try:
-                diff = self.git_utils.get_diff_between_branches(main_branch, branch)
-            except:
-                # If we fail to get diff (e.g. branch is main_branch itself), use empty diff
+            if branch == main_branch:
                 diff = ""
-            diff = self.git_utils.get_diff_between_branches(main_branch, branch)
+            else:
+                try:
+                    diff = self.git_utils.get_diff_between_branches(main_branch, branch)
+                except:
+                    # If we fail to get diff, use empty diff
+                    diff = ""
             files, lines = self._get_diff_metadata(diff)
             branch_data[branch] = {
                 'diff': diff,
@@ -46,8 +48,6 @@ class ConflictPredictor:
             for branch_b in branches[i+1:]:
                 if branch_b == main_branch:
                     continue
-            data_a = branch_data[branch_a]
-            for branch_b in branches[i+1:]:
                 data_b = branch_data[branch_b]
 
                 overlap = data_a['files'] & data_b['files']
@@ -112,4 +112,3 @@ class ConflictPredictor:
             return False
 
         return seq.ratio() > 0.7
-        return seq.ratio() > 0.7 

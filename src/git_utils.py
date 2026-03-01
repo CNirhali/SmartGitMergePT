@@ -12,19 +12,14 @@ class GitUtils:
         return self.repo.git.diff(f'{branch_a}..{branch_b}')
 
     def simulate_merge(self, source_branch: str, target_branch: str) -> Tuple[bool, str]:
-        # Checkout target branch
-        self.repo.git.checkout(target_branch)
+        """BOLT: Perform in-memory merge simulation using git merge-tree for speed"""
         try:
-            self.repo.git.merge(source_branch, '--no-commit', '--no-ff')
-            # If merge succeeds, abort to keep repo clean
-            try:
-                self.repo.git.merge('--abort')
-            except:
-                pass
+            # git merge-tree <branch1> <branch2> performs an in-memory merge
+            # It returns non-zero exit code if there are conflicts
+            output = self.repo.git.merge_tree(source_branch, target_branch)
+            if 'CONFLICT' in output:
+                return False, output
             return True, "No conflicts detected."
         except git.exc.GitCommandError as e:
-            try:
-                self.repo.git.merge('--abort')
-            except:
-                pass
-            return False, str(e) 
+            # If git merge-tree returns non-zero, it usually means there were conflicts
+            return False, str(e)
