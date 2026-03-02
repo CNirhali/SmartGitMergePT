@@ -12,3 +12,8 @@
 **Vulnerability:** The `InputValidator.validate_path` function used a weak `startswith` check on normalized paths, which could be bypassed by sibling directories with matching prefixes (e.g., `/base/path-secrets` matching `/base/path`).
 **Learning:** Simple string prefix matching is insufficient for path validation even after normalization. Directory boundaries must be explicitly respected.
 **Prevention:** Use `os.path.commonpath` with absolute paths to ensure the validated path is strictly a descendant of the base directory.
+
+## 2026-03-02 - [Stack Trace Leakage in Error Summary]
+**Vulnerability:** The `ErrorHandler.get_error_summary` method included full Python stack traces (via `traceback.format_exc()`) in the public-facing health status report.
+**Learning:** Error details collected for internal debugging can inadvertently be exposed through status/summary APIs if not explicitly sanitized at the egress point.
+**Prevention:** Always scrub sensitive internal technical details like stack traces from data structures before returning them through public-facing or cross-boundary APIs (CWE-209). Use shallow copies to sanitize output without affecting internal debug logs.
