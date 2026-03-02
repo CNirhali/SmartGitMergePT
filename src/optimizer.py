@@ -4,6 +4,7 @@ Provides caching, async operations, resource management, and performance improve
 """
 
 import asyncio
+import base64
 import functools
 import gc
 import hashlib
@@ -11,6 +12,7 @@ import json
 import logging
 import os
 import time
+import zlib
 from abc import ABC, abstractmethod
 from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
@@ -107,15 +109,19 @@ class SmartCache:
             # Try memory cache first
             if key in self.cache:
                 self.hits += 1
-                return self.cache[key]
+                value = self.cache[key]
+                # Always decompress if it's a compressed string for transparency
+                return self._decompress_value(value)
             
             # Try persistent cache if enabled
             if self.config.enable_persistence:
                 value = self._load_from_disk(key)
                 if value is not None:
                     self.hits += 1
+                    # Store in memory cache for consistency (keep internal state consistent)
                     self.cache[key] = value
-                    return value
+                    # Return decompressed value
+                    return self._decompress_value(value)
             
             self.misses += 1
             return None
@@ -176,12 +182,24 @@ class SmartCache:
         }
     
     def _compress_value(self, value: Any) -> Any:
-        """Compress cache value"""
-        # Note: Current implementation is just a placeholder that hashes the data.
-        # This causes data loss and is a known bug to be addressed in optimizer.py
+        """Compress cache value using zlib and base64"""
         if isinstance(value, str) and len(value) > 1000:
-            # Simple compression for large strings
-            return f"COMPRESSED:{hashlib.md5(value.encode()).hexdigest()}"
+            # Actual compression for large strings
+            compressed = zlib.compress(value.encode('utf-8'))
+            encoded = base64.b64encode(compressed).decode('utf-8')
+            return f"ZLIB_COMPRESSED:{encoded}"
+        return value
+
+    def _decompress_value(self, value: Any) -> Any:
+        """Decompress cache value"""
+        if isinstance(value, str) and value.startswith("ZLIB_COMPRESSED:"):
+            try:
+                encoded = value.replace("ZLIB_COMPRESSED:", "", 1)
+                compressed = base64.b64decode(encoded)
+                return zlib.decompress(compressed).decode('utf-8')
+            except Exception as e:
+                logger.error(f"Decompression error: {e}")
+                return value
         return value
     
     def _load_from_disk(self, key: str) -> Optional[Any]:
@@ -277,6 +295,8 @@ class ResourceManager:
         self.memory_usage = []
         self.cpu_usage = []
         self.gc_stats = defaultdict(int)
+        # Initialize CPU counter for non-blocking check_cpu_usage
+        psutil.cpu_percent(interval=None)
     
     def check_memory_usage(self) -> Tuple[bool, float]:
         """Check current memory usage"""
@@ -297,8 +317,9 @@ class ResourceManager:
         return is_healthy, usage_mb
     
     def check_cpu_usage(self) -> Tuple[bool, float]:
-        """Check current CPU usage"""
-        cpu_percent = psutil.cpu_percent(interval=1)
+        """Check current CPU usage (non-blocking)"""
+        # interval=None returns the CPU usage since the last call or __init__
+        cpu_percent = psutil.cpu_percent(interval=None)
         is_healthy = cpu_percent < self.cpu_limit_percent
         
         self.cpu_usage.append({

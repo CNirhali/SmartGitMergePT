@@ -111,9 +111,14 @@ class TestSmartCache:
         large_string = "x" * 2000
         self.cache.set("large_key", large_string)
         
-        # Should be compressed (currently hashes the data, causing expected data loss for large strings)
+        # Should be transparently decompressed on get
         retrieved = self.cache.get("large_key")
-        assert retrieved.startswith("COMPRESSED:")
+        assert retrieved == large_string
+
+        # Verify it is stored as compressed in the internal cache
+        internal_value = self.cache.cache["large_key"]
+        assert isinstance(internal_value, str)
+        assert internal_value.startswith("ZLIB_COMPRESSED:")
     
     def test_persistent_cache(self):
         """Test persistent cache functionality"""
