@@ -19,20 +19,39 @@ template = '''
         th { background: #f6f8fa; font-weight: 600; }
         tr:hover { background-color: #f6f8fa; }
         .present { color: #1a7f37; font-weight: bold; }
-        .absent { color: #6e7781; }
-        .refresh-btn { margin-bottom: 1em; padding: 6px 12px; cursor: pointer; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; font-weight: 600; }
+        .absent { color: #57606a; }
+        .refresh-btn { margin-bottom: 1em; padding: 6px 12px; cursor: pointer; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; font-weight: 600; transition: background-color 0.2s; }
         .refresh-btn:hover { background: #f3f4f6; }
+        .refresh-btn:active { background: #ebecf0; }
+        tr { transition: background-color 0.1s; }
         code { background: #afb8c133; padding: 0.2em 0.4em; border-radius: 6px; font-size: 85%; }
-        .timestamp { color: #6e7781; font-size: 0.9em; margin-bottom: 2em; }
-        .empty-state { padding: 20px; text-align: center; background: #f6f8fa; border: 1px dashed #d0d7de; border-radius: 6px; color: #6e7781; }
+        .timestamp { color: #57606a; font-size: 0.9em; margin-bottom: 2em; }
+        .empty-state { padding: 20px; text-align: center; background: #f6f8fa; border: 1px dashed #d0d7de; border-radius: 6px; color: #57606a; }
         .conflict-yes { color: #cf222e; font-weight: 600; }
-        .conflict-no { color: #6e7781; }
+        .conflict-no { color: #57606a; }
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #0969da;
+            color: white;
+            padding: 8px;
+            z-index: 100;
+            text-decoration: none;
+            border-bottom-right-radius: 6px;
+        }
+        .skip-link:focus {
+            top: 0;
+            outline: 2px solid #0969da;
+            outline-offset: 2px;
+        }
     </style>
 </head>
 <body>
-    <button class="refresh-btn" onclick="window.location.reload()" aria-label="Refresh conflict predictions">Refresh</button>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <button class="refresh-btn" onclick="refresh()" aria-label="Refresh conflict predictions (Press 'r')">Refresh</button>
     <div class="timestamp">Last updated: {{ now.strftime('%Y-%m-%d %H:%M:%S') }}</div>
-    <h1>SmartGitMergePT Dashboard</h1>
+    <h1 id="main-content">SmartGitMergePT Dashboard</h1>
 
     <h2>Branches</h2>
     <ul>
@@ -58,7 +77,12 @@ template = '''
     {% if predictions %}
     <table aria-label="Predicted merge conflicts">
         <thead>
-            <tr><th>Branches</th><th>Files</th><th>Line Overlap</th><th>Semantic Conflict</th></tr>
+            <tr>
+                <th scope="col">Branches</th>
+                <th scope="col">Files</th>
+                <th scope="col">Line Overlap</th>
+                <th scope="col">Semantic Conflict</th>
+            </tr>
         </thead>
         <tbody>
             {% for pred in predictions %}
@@ -86,6 +110,20 @@ template = '''
     {% else %}
     <div class="empty-state">No likely conflicts detected between branches. Everything looks clear! ✨</div>
     {% endif %}
+
+    <script>
+        const refreshBtn = document.querySelector('.refresh-btn');
+        function refresh() {
+            refreshBtn.textContent = 'Refreshing...';
+            refreshBtn.disabled = true;
+            window.location.reload();
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                refresh();
+            }
+        });
+    </script>
 </body>
 </html>
 '''
