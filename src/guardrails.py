@@ -407,11 +407,19 @@ class ErrorHandler:
         self.recovery_strategies[error_type] = strategy
     
     def get_error_summary(self) -> Dict[str, Any]:
-        """Get error summary"""
+        """Get error summary with sensitive information (tracebacks) removed"""
+        recent_errors = []
+        for error in list(self.error_history)[-10:]:
+            # Create a shallow copy and remove the traceback for the summary report
+            safe_error = error.copy()
+            if "traceback" in safe_error:
+                del safe_error["traceback"]
+            recent_errors.append(safe_error)
+
         return {
             "total_errors": sum(self.error_counts.values()),
             "error_types": dict(self.error_counts),
-            "recent_errors": list(self.error_history)[-10:]
+            "recent_errors": recent_errors
         }
 
 class GuardrailsManager:
