@@ -87,14 +87,20 @@ class SystemHealthChecker(HealthChecker):
     """System-level health checks"""
     
     def __init__(self):
-        self.name = "system"
+        # Initialize CPU percent to avoid blocking on first call
+        psutil.cpu_percent(interval=None)
+
+    @property
+    def name(self) -> str:
+        """Health check name"""
+        return "system"
     
     async def check(self) -> HealthCheck:
         start_time = time.time()
         
         try:
-            # Check CPU usage
-            cpu_percent = psutil.cpu_percent(interval=1)
+            # Check CPU usage (non-blocking)
+            cpu_percent = psutil.cpu_percent(interval=None)
             
             # Check memory usage
             memory = psutil.virtual_memory()
@@ -146,7 +152,11 @@ class DatabaseHealthChecker(HealthChecker):
     
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.name = "database"
+
+    @property
+    def name(self) -> str:
+        """Health check name"""
+        return "database"
     
     async def check(self) -> HealthCheck:
         start_time = time.time()
@@ -220,7 +230,11 @@ class NetworkHealthChecker(HealthChecker):
             "https://httpbin.org/get",
             "https://www.google.com"
         ]
-        self.name = "network"
+
+    @property
+    def name(self) -> str:
+        """Health check name"""
+        return "network"
     
     async def check(self) -> HealthCheck:
         start_time = time.time()
@@ -327,32 +341,35 @@ class MetricsCollector:
                 time.sleep(10)  # Wait before retry
     
     def _collect_system_metrics(self):
-        """Collect system metrics"""
-        timestamp = datetime.now()
-        
-        # CPU metrics
-        cpu_percent = psutil.cpu_percent(interval=1)
-        self.add_metric("cpu_usage", cpu_percent, timestamp)
-        
-        # Memory metrics
-        memory = psutil.virtual_memory()
-        self.add_metric("memory_usage", memory.percent, timestamp)
-        self.add_metric("memory_available_mb", memory.available / (1024 * 1024), timestamp)
-        
-        # Disk metrics
-        disk = psutil.disk_usage('/')
-        self.add_metric("disk_usage", disk.percent, timestamp)
-        self.add_metric("disk_free_gb", disk.free / (1024 * 1024 * 1024), timestamp)
-        
-        # Network metrics
-        net_io = psutil.net_io_counters()
-        self.add_metric("network_bytes_sent", net_io.bytes_sent, timestamp)
-        self.add_metric("network_bytes_recv", net_io.bytes_recv, timestamp)
-        
-        # Process metrics
-        process = psutil.Process()
-        self.add_metric("process_memory_mb", process.memory_info().rss / (1024 * 1024), timestamp)
-        self.add_metric("process_cpu_percent", process.cpu_percent(), timestamp)
+        """Collect system metrics with error handling"""
+        try:
+            timestamp = datetime.now()
+
+            # CPU metrics (non-blocking)
+            cpu_percent = psutil.cpu_percent(interval=None)
+            self.add_metric("cpu_usage", cpu_percent, timestamp)
+
+            # Memory metrics
+            memory = psutil.virtual_memory()
+            self.add_metric("memory_usage", memory.percent, timestamp)
+            self.add_metric("memory_available_mb", memory.available / (1024 * 1024), timestamp)
+
+            # Disk metrics
+            disk = psutil.disk_usage('/')
+            self.add_metric("disk_usage", disk.percent, timestamp)
+            self.add_metric("disk_free_gb", disk.free / (1024 * 1024 * 1024), timestamp)
+
+            # Network metrics
+            net_io = psutil.net_io_counters()
+            self.add_metric("network_bytes_sent", net_io.bytes_sent, timestamp)
+            self.add_metric("network_bytes_recv", net_io.bytes_recv, timestamp)
+
+            # Process metrics
+            process = psutil.Process()
+            self.add_metric("process_memory_mb", process.memory_info().rss / (1024 * 1024), timestamp)
+            self.add_metric("process_cpu_percent", process.cpu_percent(), timestamp)
+        except Exception as e:
+            logger.error(f"Error collecting system metrics: {e}")
     
     def add_metric(self, name: str, value: float, timestamp: datetime, tags: Dict[str, str] = None):
         """Add a metric"""

@@ -7,6 +7,7 @@ import asyncio
 import functools
 import hashlib
 import hmac
+import html
 import json
 import logging
 import os
@@ -78,7 +79,7 @@ class RateLimiter:
         self.requests = defaultdict(deque)
     
     def is_allowed(self, key: str) -> bool:
-        now = time.time()
+        now = time.monotonic()
         window_start = now - self.window_seconds
         
         # Clean old requests
@@ -186,12 +187,14 @@ class InputValidator:
     
     def _sanitize_html(self, text: str) -> str:
         """Basic HTML sanitization"""
-        # Remove HTML tags
+        # Remove common HTML tag patterns
         text = re.sub(r'<[^>]+>', '', text)
         # Remove script tags
         text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
         # Remove javascript: URLs
         text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
+        # Escape HTML characters last for robustness
+        text = html.escape(text)
         return text
 
 class DataEncryption:

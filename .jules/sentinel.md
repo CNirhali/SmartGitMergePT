@@ -17,3 +17,8 @@
 **Vulnerability:** The `ErrorHandler.get_error_summary` method included full Python stack traces (via `traceback.format_exc()`) in the public-facing health status report.
 **Learning:** Error details collected for internal debugging can inadvertently be exposed through status/summary APIs if not explicitly sanitized at the egress point.
 **Prevention:** Always scrub sensitive internal technical details like stack traces from data structures before returning them through public-facing or cross-boundary APIs (CWE-209). Use shallow copies to sanitize output without affecting internal debug logs.
+
+## 2026-03-03 - [Blocking Event Loop in Async Health Checks]
+**Vulnerability:** Use of `psutil.cpu_percent(interval=1)` in an `async` health check method blocked the entire `asyncio` event loop for 1 second per check, creating a potential DoS vector and degrading performance.
+**Learning:** Blocking calls in `async` functions negate the benefits of concurrency. `psutil.cpu_percent` should use `interval=None` for non-blocking checks after an initial call.
+**Prevention:** Avoid blocking synchronous calls in `async` methods. For `psutil`, initialize the counter in `__init__` and use `interval=None` in the check method.
