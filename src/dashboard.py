@@ -25,8 +25,15 @@ template = '''
         .refresh-btn:active { background: #ebecf0; }
         tr { transition: background-color 0.1s; }
         code { background: #afb8c133; padding: 0.2em 0.4em; border-radius: 6px; font-size: 85%; }
-        .timestamp { color: #57606a; font-size: 0.9em; margin-bottom: 2em; }
+        .timestamp { color: #57606a; font-size: 0.9em; margin-bottom: 1em; }
         .empty-state { padding: 20px; text-align: center; background: #f6f8fa; border: 1px dashed #d0d7de; border-radius: 6px; color: #57606a; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }
+        .badge-success { background: #dafbe1; color: #1a7f37; }
+        .badge-error { background: #ffebe9; color: #cf222e; }
+        .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; }
+        kbd { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 3px; box-shadow: inset 0 -1px 0 #d0d7de; color: #24292f; font-family: ui-monospace, monospace; font-size: 11px; padding: 3px 5px; margin-left: 4px; }
+        .summary { display: flex; gap: 1em; margin: 1.5em 0; }
+        .summary-item { background: #f6f8fa; padding: 12px 20px; border-radius: 8px; border: 1px solid #d0d7de; }
         .conflict-yes { color: #cf222e; font-weight: 600; }
         .conflict-no { color: #57606a; }
         .skip-link {
@@ -49,16 +56,28 @@ template = '''
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <button class="refresh-btn" onclick="refresh()" aria-label="Refresh conflict predictions (Press 'r')">Refresh</button>
+    <button class="refresh-btn" onclick="refresh()" aria-label="Refresh conflict predictions (Press 'r')">Refresh<kbd>r</kbd></button>
     <div class="timestamp">Last updated: {{ now.strftime('%Y-%m-%d %H:%M:%S') }}</div>
     <h1 id="main-content">SmartGitMergePT Dashboard</h1>
 
-    <h2>Branches</h2>
-    <ul>
+    <div class="summary">
+        <div class="summary-item">
+            <strong>Branches</strong>: {{ branches|length }}
+        </div>
+        <div class="summary-item">
+            <strong>Conflict Pairs</strong>:
+            <span class="badge {{ 'badge-error' if predictions else 'badge-success' }}">
+                {{ predictions|length }}
+            </span>
+        </div>
+    </div>
+
+    <h2>Monitored Branches</h2>
+    <div style="margin-bottom: 2em;">
     {% for branch in branches %}
-        <li><code>{{ branch }}</code></li>
+        <span class="branch-tag">{{ branch }}</span>
     {% endfor %}
-    </ul>
+    </div>
 
     <h2>Scenario Types</h2>
     <ul>
@@ -87,21 +106,33 @@ template = '''
         <tbody>
             {% for pred in predictions %}
             <tr>
-                <td><code>{{ pred['branches'][0] }}</code> ↔ <code>{{ pred['branches'][1] }}</code></td>
+                <td>
+                    <span class="branch-tag">{{ pred['branches'][0] }}</span>
+                    <span style="color: #57606a; margin: 0 4px;">↔</span>
+                    <span class="branch-tag">{{ pred['branches'][1] }}</span>
+                </td>
                 <td>
                     {% if pred['files'] %}
                         {% for file in pred['files'] %}
                             <code>{{ file }}</code>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     {% else %}
-                        —
+                        <span class="absent">—</span>
                     {% endif %}
                 </td>
-                <td class="{{ 'conflict-yes' if pred['line_conflicts'] else 'conflict-no' }}">
-                    {{ '⚠️ Yes' if pred['line_conflicts'] else '—' }}
+                <td>
+                    {% if pred['line_conflicts'] %}
+                        <span class="badge badge-error">⚠️ Yes</span>
+                    {% else %}
+                        <span class="absent">—</span>
+                    {% endif %}
                 </td>
-                <td class="{{ 'conflict-yes' if pred['semantic_conflict'] else 'conflict-no' }}">
-                    {{ '⚠️ Yes' if pred['semantic_conflict'] else '—' }}
+                <td>
+                    {% if pred['semantic_conflict'] %}
+                        <span class="badge badge-error">⚠️ Yes</span>
+                    {% else %}
+                        <span class="absent">—</span>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
