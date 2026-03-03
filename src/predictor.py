@@ -20,7 +20,6 @@ class ConflictPredictor:
                 main_branch = 'master'
             else:
                 main_branch = 'main'
-            main_branch = 'main'
 
         # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch
         # This reduces Git operations from O(N^2) to O(N) where N is number of branches
@@ -52,8 +51,13 @@ class ConflictPredictor:
 
                 overlap = data_a['files'] & data_b['files']
 
-                # BOLT: Using pre-calculated line sets (O(1) set intersection vs O(L) re-parsing)
-                line_conflicts = bool(data_a['lines'] & data_b['lines'])
+                # BOLT: Using pre-calculated line sets per file
+                # Only check line-level overlap for files that both branches modified
+                line_conflicts = False
+                for common_file in overlap:
+                    if data_a['lines'].get(common_file) & data_b['lines'].get(common_file):
+                        line_conflicts = True
+                        break
 
                 # BOLT: Semantic similarity is slow, only check if there's no overlap already
                 # or if some files overlap to warrant deeper check
@@ -72,20 +76,24 @@ class ConflictPredictor:
         return predictions
 
     @lru_cache(maxsize=128)
-    def _get_diff_metadata(self, diff: str) -> Tuple[Set[str], Set[str]]:
-        """BOLT: Extract changed files and lines in a single pass with caching"""
+    def _get_diff_metadata(self, diff: str) -> Tuple[Set[str], Dict[str, Set[str]]]:
+        """BOLT: Extract changed files and lines grouped by file in a single pass with caching"""
         files = set()
-        lines = set()
+        lines_by_file = {}
+        current_file = None
         for line in diff.splitlines():
             if line.startswith('diff --git'):
                 parts = line.split(' ')
                 if len(parts) > 2:
-                    files.add(parts[2][2:])  # Remove the a/ prefix
+                    current_file = parts[2][2:]  # Remove the a/ prefix
+                    files.add(current_file)
+                    if current_file not in lines_by_file:
+                        lines_by_file[current_file] = set()
             elif line.startswith('+') or line.startswith('-'):
                 # Avoid capturing the diff header lines as changes
-                if not (line.startswith('+++') or line.startswith('---')):
-                    lines.add(line[1:])
-        return files, lines
+                if not (line.startswith('+++') or line.startswith('---')) and current_file:
+                    lines_by_file[current_file].add(line[1:])
+        return files, lines_by_file
 
     def _extract_changed_files(self, diff: str) -> List[str]:
         # Maintained for backward compatibility but using _get_diff_metadata internally is better
@@ -94,9 +102,13 @@ class ConflictPredictor:
 
     def _line_level_overlap(self, diff_a: str, diff_b: str) -> bool:
         # Maintained for backward compatibility
-        _, lines_a = self._get_diff_metadata(diff_a)
-        _, lines_b = self._get_diff_metadata(diff_b)
-        return bool(lines_a & lines_b)
+        files_a, lines_by_file_a = self._get_diff_metadata(diff_a)
+        files_b, lines_by_file_b = self._get_diff_metadata(diff_b)
+        overlap = files_a & files_b
+        for common_file in overlap:
+            if lines_by_file_a.get(common_file) & lines_by_file_b.get(common_file):
+                return True
+        return False
 
     def _semantic_similarity(self, diff_a: str, diff_b: str) -> bool:
         # BOLT: SequenceMatcher is expensive. Use quick_ratio for early rejection.
