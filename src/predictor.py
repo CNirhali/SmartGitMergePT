@@ -1,7 +1,6 @@
 from git_utils import GitUtils
 from typing import List, Dict, Set, Tuple
 import difflib
-from functools import lru_cache
 
 class ConflictPredictor:
     def __init__(self, repo_path: str = "."):
@@ -9,16 +8,16 @@ class ConflictPredictor:
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
         predictions = []
-        # Try to determine the default branch
-        try:
-            main_branch = self.git_utils.repo.active_branch.name
-        except:
-            # Fallback to checking for main/master in branches list
-            if 'main' in branches:
-                main_branch = 'main'
-            elif 'master' in branches:
-                main_branch = 'master'
-            else:
+        # BOLT: Improve main_branch detection to prioritize 'main' or 'master' from input list
+        # This prevents comparing everything against an active feature branch.
+        if 'main' in branches:
+            main_branch = 'main'
+        elif 'master' in branches:
+            main_branch = 'master'
+        else:
+            try:
+                main_branch = self.git_utils.repo.active_branch.name
+            except:
                 main_branch = 'main'
 
         # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch
@@ -29,7 +28,8 @@ class ConflictPredictor:
                 diff = ""
             else:
                 try:
-                    diff = self.git_utils.get_diff_between_branches(main_branch, branch)
+                    # BOLT: Using unified=0 to reduce diff size as context is not needed for overlap check
+                    diff = self.git_utils.get_diff_between_branches(main_branch, branch, unified=0)
                 except:
                     # If we fail to get diff, use empty diff
                     diff = ""
@@ -75,7 +75,6 @@ class ConflictPredictor:
                     })
         return predictions
 
-    @lru_cache(maxsize=128)
     def _get_diff_metadata(self, diff: str) -> Tuple[Set[str], Dict[str, Set[str]]]:
         """BOLT: Extract changed files and lines grouped by file in a single pass with caching"""
         files = set()
