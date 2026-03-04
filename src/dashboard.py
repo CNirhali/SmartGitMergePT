@@ -18,8 +18,8 @@ template = '''
         th, td { border: 1px solid #d0d7de; padding: 12px; text-align: left; }
         th { background: #f6f8fa; font-weight: 600; }
         tr:hover { background-color: #f6f8fa; }
-        .present { color: #1a7f37; font-weight: bold; }
-        .absent { color: #57606a; }
+        .present { color: #cf222e; font-weight: bold; }
+        .absent { color: #1a7f37; }
         .refresh-btn { margin-bottom: 1em; padding: 6px 12px; cursor: pointer; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; font-weight: 600; transition: background-color 0.2s; }
         .refresh-btn:hover { background: #f3f4f6; }
         .refresh-btn:active { background: #ebecf0; }
@@ -30,7 +30,11 @@ template = '''
         .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }
         .badge-success { background: #dafbe1; color: #1a7f37; }
         .badge-error { background: #ffebe9; color: #cf222e; }
-        .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; }
+        .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; position: relative; }
+        .branch-tag:hover { background: #cfeeff; border-color: #0969da; }
+        .branch-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
+        .copy-tooltip { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #24292f; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; }
+        .copy-tooltip.show { opacity: 1; }
         kbd { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 3px; box-shadow: inset 0 -1px 0 #d0d7de; color: #24292f; font-family: ui-monospace, monospace; font-size: 11px; padding: 3px 5px; margin-left: 4px; }
         .summary { display: flex; gap: 1em; margin: 1.5em 0; }
         .summary-item { background: #f6f8fa; padding: 12px 20px; border-radius: 8px; border: 1px solid #d0d7de; }
@@ -75,19 +79,22 @@ template = '''
     <h2>Monitored Branches</h2>
     <div style="margin-bottom: 2em;">
     {% for branch in branches %}
-        <span class="branch-tag">{{ branch }}</span>
+        <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}" data-branch="{{ branch }}">{{ branch }}</span>
     {% endfor %}
     </div>
 
     <h2>Scenario Types</h2>
-    <ul>
+    <ul style="list-style: none; padding-left: 0;">
         <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}">
+            {% if scenario_types['file_overlap'] %}⚠️{% else %}✅{% endif %}
             <strong>File Overlap</strong>: Both branches modify the same file(s).
         </li>
         <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}">
+            {% if scenario_types['line_overlap'] %}⚠️{% else %}✅{% endif %}
             <strong>Line Overlap</strong>: Both branches change the same or similar lines in a file.
         </li>
         <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}">
+            {% if scenario_types['semantic_conflict'] %}⚠️{% else %}✅{% endif %}
             <strong>Semantic Conflict</strong>: Changes are different but may cause logical or functional conflicts.
         </li>
     </ul>
@@ -107,9 +114,9 @@ template = '''
             {% for pred in predictions %}
             <tr>
                 <td>
-                    <span class="branch-tag">{{ pred['branches'][0] }}</span>
+                    <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}</span>
                     <span style="color: #57606a; margin: 0 4px;">↔</span>
-                    <span class="branch-tag">{{ pred['branches'][1] }}</span>
+                    <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][1] }}" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}</span>
                 </td>
                 <td>
                     {% if pred['files'] %}
@@ -149,6 +156,29 @@ template = '''
             refreshBtn.disabled = true;
             window.location.reload();
         }
+
+        function copyToClipboard(element) {
+            const text = element.getAttribute('data-branch');
+            if (element.querySelector('.copy-tooltip')) return;
+            navigator.clipboard.writeText(text).then(() => {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'copy-tooltip show';
+                tooltip.textContent = 'Copied!';
+                element.appendChild(tooltip);
+                setTimeout(() => tooltip.remove(), 1000);
+            });
+        }
+
+        document.querySelectorAll('.branch-tag').forEach(tag => {
+            tag.addEventListener('click', () => copyToClipboard(tag));
+            tag.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    copyToClipboard(tag);
+                }
+            });
+        });
+
         document.addEventListener('keydown', (e) => {
             if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
                 refresh();
