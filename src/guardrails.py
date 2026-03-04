@@ -8,6 +8,7 @@ import functools
 import hashlib
 import hmac
 import html
+import ipaddress
 import json
 import logging
 import os
@@ -168,18 +169,59 @@ class InputValidator:
             return False, f"Path validation error: {str(e)}"
     
     def validate_url(self, url: str) -> Tuple[bool, str]:
-        """Validate URL for security"""
+        """Validate URL for security (SSRF protection)"""
         try:
             parsed = urlparse(url)
             
             # Check for dangerous protocols
-            dangerous_protocols = {'file', 'javascript', 'data', 'vbscript'}
+            dangerous_protocols = {'file', 'javascript', 'data', 'vbscript', 'gopher', 'dict', 'ldap', 'ftp', 'tftp'}
             if parsed.scheme.lower() in dangerous_protocols:
-                return False, "Dangerous URL protocol detected"
+                return False, f"Dangerous URL protocol detected: {parsed.scheme}"
+
+            hostname = parsed.hostname
+            if not hostname:
+                return False, "URL must have a hostname"
             
-            # Check for localhost/private IPs if not allowed
-            if parsed.hostname in {'localhost', '127.0.0.1', '::1'}:
+            # Check for literal loopback/private hostnames
+            if hostname.lower() in {'localhost', 'loopback', 'localhost.localdomain'}:
                 return False, "Local URL not allowed"
+
+            # Handle IP-based hostnames for robust SSRF protection
+            try:
+                # Remove brackets from IPv6 literal if present
+                ip_str = hostname.strip('[]')
+                ip = ipaddress.ip_address(ip_str)
+
+                # Check for loopback, private, link-local, and reserved ranges
+                if ip.is_loopback:
+                    return False, "Loopback IP not allowed"
+                if ip.is_private:
+                    return False, "Private IP not allowed"
+                if ip.is_link_local:
+                    return False, "Link-local IP not allowed"
+                if ip.is_multicast:
+                    return False, "Multicast IP not allowed"
+                if ip.is_reserved:
+                    return False, "Reserved IP not allowed"
+                if ip.is_unspecified:
+                    return False, "Unspecified IP not allowed"
+
+            except ValueError:
+                # Hostname is not a valid IP address, check for shorthand IP notation
+                try:
+                    # socket.inet_aton handles shorthand like 127.1
+                    import socket
+                    packed_ip = socket.inet_aton(hostname)
+                    ip_str = socket.inet_ntoa(packed_ip)
+                    ip = ipaddress.ip_address(ip_str)
+
+                    if ip.is_loopback:
+                        return False, "Loopback IP (shorthand) not allowed"
+                    if ip.is_private:
+                        return False, "Private IP (shorthand) not allowed"
+                except (socket.error, ValueError):
+                    # Hostname is truly not an IP or invalid IP
+                    pass
             
             return True, url
         except Exception as e:

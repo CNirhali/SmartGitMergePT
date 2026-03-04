@@ -22,3 +22,8 @@
 **Vulnerability:** Use of `psutil.cpu_percent(interval=1)` in an `async` health check method blocked the entire `asyncio` event loop for 1 second per check, creating a potential DoS vector and degrading performance.
 **Learning:** Blocking calls in `async` functions negate the benefits of concurrency. `psutil.cpu_percent` should use `interval=None` for non-blocking checks after an initial call.
 **Prevention:** Avoid blocking synchronous calls in `async` methods. For `psutil`, initialize the counter in `__init__` and use `interval=None` in the check method.
+
+## 2026-03-04 - [SSRF Vulnerability in URL Validator]
+**Vulnerability:** `InputValidator.validate_url` allowed Server-Side Request Forgery (SSRF) bypasses via shorthand IP notation (e.g., `127.1`), non-standard loopback addresses (e.g., `127.0.0.2`), and cloud metadata/private IP ranges.
+**Learning:** Simple string matching against a few hostnames is insufficient for URL security. Attackers can use various IP representations to target internal resources.
+**Prevention:** Use the `ipaddress` module for comprehensive CIDR-based validation of loopback and private ranges. Normalize shorthand IP notations using `socket.inet_aton` before performing IP-level checks.
