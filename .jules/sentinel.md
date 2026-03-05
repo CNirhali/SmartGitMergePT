@@ -27,3 +27,8 @@
 **Vulnerability:** `InputValidator.validate_url` allowed Server-Side Request Forgery (SSRF) bypasses via shorthand IP notation (e.g., `127.1`), non-standard loopback addresses (e.g., `127.0.0.2`), and cloud metadata/private IP ranges.
 **Learning:** Simple string matching against a few hostnames is insufficient for URL security. Attackers can use various IP representations to target internal resources.
 **Prevention:** Use the `ipaddress` module for comprehensive CIDR-based validation of loopback and private ranges. Normalize shorthand IP notations using `socket.inet_aton` before performing IP-level checks.
+
+## 2026-03-05 - [Sensitive Data Exposure in Agentic Tracker]
+**Vulnerability:** The `AgenticTracker` was capturing and saving raw webcam images of developers and storing session activity in a local database without proper Git exclusion, creating a high risk of sensitive biometric and activity data being accidentally committed and exposed.
+**Learning:** Automated tracking systems that capture personal data must have robust privacy controls integrated from the start, including automatic sanitization (e.g., face blurring) and strict repository hygiene (e.g., `.gitignore`).
+**Prevention:** Implement automatic face blurring for biometric data at the point of capture and ensure all tracking artifacts, logs, and local databases are explicitly ignored by version control.

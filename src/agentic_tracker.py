@@ -75,7 +75,8 @@ class AgenticTracker:
             "screen_recording": True,
             "webcam_monitoring": True,
             "keyboard_tracking": True,
-            "mouse_tracking": True
+            "mouse_tracking": True,
+            "blur_faces": True
         }
     
     def _setup_database(self):
@@ -295,6 +296,10 @@ class AgenticTracker:
             if not ret:
                 return
             
+            # Blur faces if enabled for privacy
+            if self.config.get("blur_faces", False):
+                frame = self._blur_faces_in_frame(frame)
+
             # Save webcam image
             webcam_path = self._save_webcam_image(frame)
             
@@ -322,6 +327,36 @@ class AgenticTracker:
         results = self.face_detection.process(rgb_frame)
         return len(results.detections) > 0 if results.detections else False
     
+    def _blur_faces_in_frame(self, frame):
+        """Blur detected faces in the frame for privacy"""
+        try:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = self.face_detection.process(rgb_frame)
+
+            if results.detections:
+                h, w, _ = frame.shape
+                for detection in results.detections:
+                    bbox = detection.location_data.relative_bounding_box
+                    x = int(bbox.xmin * w)
+                    y = int(bbox.ymin * h)
+                    bw = int(bbox.width * w)
+                    bh = int(bbox.height * h)
+
+                    # Ensure coordinates are within frame boundaries
+                    x1, y1 = max(0, x), max(0, y)
+                    x2, y2 = min(x + bw, w), min(y + bh, h)
+
+                    if x2 > x1 and y2 > y1:
+                        roi = frame[y1:y2, x1:x2]
+                        # Apply heavy Gaussian blur to the face region
+                        blurred_roi = cv2.GaussianBlur(roi, (99, 99), 30)
+                        frame[y1:y2, x1:x2] = blurred_roi
+
+            return frame
+        except Exception as e:
+            self.logger.error(f"Error blurring faces: {e}")
+            return frame
+
     def _identify_developer(self, frame) -> Optional[str]:
         """Identify developer from face recognition"""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
