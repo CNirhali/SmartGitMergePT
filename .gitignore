@@ -37,4 +37,11 @@ ENV/
 Thumbs.db
 
 # Demo repositories (they are generated dynamically)
-demo/conflict_scenarios/demo-repo/ 
+demo/conflict_scenarios/demo-repo/
+
+# SmartGitMergePT Tracking and Cache
+.smartgit_tracker.db
+.smartgit_config.json
+tracker.log
+tracking_data/
+.cache/
