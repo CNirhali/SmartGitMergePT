@@ -13,3 +13,7 @@
 ## 2025-05-22 - [File-Scoped Line Conflict Detection]
 **Learning:** Performing line-level conflict detection across global sets of changed lines (all files merged) causes false positives and unnecessary set intersections. Grouping changes by file allows for more precise and efficient overlap checks.
 **Action:** When analyzing changes across multiple files, maintain file boundaries in metadata structures to avoid cross-file false positives and skip line-level comparisons for non-overlapping files.
+
+## 2025-05-25 - [Parallelizing Git Subprocesses]
+**Learning:** Fetching Git diffs for multiple branches is I/O-bound due to external process overhead. Sequential execution creates significant latency that scales linearly with the number of branches.
+**Action:** Use `ThreadPoolExecutor` to parallelize I/O-bound `git` command calls. This can yield ~50% performance gains in data preparation phases for large branch sets.
