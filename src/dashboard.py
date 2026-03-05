@@ -56,6 +56,22 @@ template = '''
             outline: 2px solid #0969da;
             outline-offset: 2px;
         }
+        .filter-container { margin: 1.5em 0; }
+        .filter-input {
+            width: 100%;
+            max-width: 400px;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .filter-input:focus {
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
+        }
+        .no-results { display: none; text-align: center; padding: 20px; color: #57606a; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; margin-top: 1em; }
     </style>
 </head>
 <body>
@@ -63,6 +79,10 @@ template = '''
     <button class="refresh-btn" onclick="refresh()" aria-label="Refresh conflict predictions (Press 'r')">Refresh<kbd>r</kbd></button>
     <div class="timestamp">Last updated: {{ now.strftime('%Y-%m-%d %H:%M:%S') }}</div>
     <h1 id="main-content">SmartGitMergePT Dashboard</h1>
+
+    <div class="filter-container">
+        <input type="text" id="filter-input" class="filter-input" placeholder="Filter branches or conflicts... (Press '/' to focus)" aria-label="Filter branches or conflicts">
+    </div>
 
     <div class="summary">
         <div class="summary-item">
@@ -77,7 +97,7 @@ template = '''
     </div>
 
     <h2>Monitored Branches</h2>
-    <div style="margin-bottom: 2em;">
+    <div id="monitored-branches-list" style="margin-bottom: 2em;">
     {% for branch in branches %}
         <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}" data-branch="{{ branch }}">{{ branch }}</span>
     {% endfor %}
@@ -179,9 +199,47 @@ template = '''
             });
         });
 
+        const filterInput = document.getElementById('filter-input');
+        const monitoredBranchTags = document.querySelectorAll('#monitored-branches-list .branch-tag');
+        const tableRows = document.querySelectorAll('tbody tr');
+        const noResults = document.createElement('div');
+        noResults.className = 'no-results';
+        noResults.textContent = 'No matching branches or conflicts found.';
+
+        const table = document.querySelector('table');
+        if (table) {
+            table.parentNode.insertBefore(noResults, table.nextSibling);
+        }
+
+        filterInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            let hasVisibleRows = false;
+
+            monitoredBranchTags.forEach(tag => {
+                const text = tag.getAttribute('data-branch').toLowerCase();
+                tag.style.display = text.includes(query) ? 'inline-block' : 'none';
+            });
+
+            tableRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const isVisible = text.includes(query);
+                row.style.display = isVisible ? '' : 'none';
+                if (isVisible) hasVisibleRows = true;
+            });
+
+            if (table) {
+                table.style.display = hasVisibleRows ? '' : 'none';
+                noResults.style.display = (!hasVisibleRows && query !== '') ? 'block' : 'none';
+            }
+        });
+
         document.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== filterInput) {
                 refresh();
+            }
+            if (e.key === '/' && document.activeElement !== filterInput) {
+                e.preventDefault();
+                filterInput.focus();
             }
         });
     </script>
