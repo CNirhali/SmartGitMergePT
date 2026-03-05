@@ -1,5 +1,6 @@
 from git_utils import GitUtils
 from typing import List, Dict, Set, Tuple
+from concurrent.futures import ThreadPoolExecutor
 import difflib
 
 class ConflictPredictor:
@@ -20,10 +21,10 @@ class ConflictPredictor:
             except:
                 main_branch = 'main'
 
-        # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch
+        # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch in parallel
         # This reduces Git operations from O(N^2) to O(N) where N is number of branches
-        branch_data = {}
-        for branch in branches:
+        # Parallelization handles I/O-bound git process calls efficiently.
+        def _fetch_branch_data(branch):
             if branch == main_branch:
                 diff = ""
             else:
@@ -31,14 +32,18 @@ class ConflictPredictor:
                     # BOLT: Using unified=0 to reduce diff size as context is not needed for overlap check
                     diff = self.git_utils.get_diff_between_branches(main_branch, branch, unified=0)
                 except:
-                    # If we fail to get diff, use empty diff
                     diff = ""
             files, lines = self._get_diff_metadata(diff)
-            branch_data[branch] = {
+            return branch, {
                 'diff': diff,
                 'files': files,
                 'lines': lines
             }
+
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(_fetch_branch_data, branches))
+
+        branch_data = dict(results)
 
         for i, branch_a in enumerate(branches):
             if branch_a == main_branch:
@@ -76,22 +81,32 @@ class ConflictPredictor:
         return predictions
 
     def _get_diff_metadata(self, diff: str) -> Tuple[Set[str], Dict[str, Set[str]]]:
-        """BOLT: Extract changed files and lines grouped by file in a single pass with caching"""
+        """BOLT: Optimized extraction of changed files and lines"""
         files = set()
         lines_by_file = {}
-        current_file = None
+        current_lines = None
+
         for line in diff.splitlines():
-            if line.startswith('diff --git'):
-                parts = line.split(' ')
-                if len(parts) > 2:
-                    current_file = parts[2][2:]  # Remove the a/ prefix
-                    files.add(current_file)
-                    if current_file not in lines_by_file:
-                        lines_by_file[current_file] = set()
-            elif line.startswith('+') or line.startswith('-'):
-                # Avoid capturing the diff header lines as changes
-                if not (line.startswith('+++') or line.startswith('---')) and current_file:
-                    lines_by_file[current_file].add(line[1:])
+            if not line:
+                continue
+
+            c0 = line[0]
+            if c0 == 'd':  # diff --git ...
+                if line.startswith('diff --git'):
+                    # Extract file path after ' b/' to avoid multiple splits
+                    b_idx = line.find(' b/')
+                    if b_idx != -1:
+                        current_file = line[b_idx + 3:]
+                        files.add(current_file)
+                        current_lines = set()
+                        lines_by_file[current_file] = current_lines
+                    else:
+                        current_lines = None
+            elif (c0 == '+' or c0 == '-') and current_lines is not None:
+                # Skip +++ or --- headers
+                if len(line) >= 3 and line[1] == c0 and line[2] == c0:
+                    continue
+                current_lines.add(line[1:])
         return files, lines_by_file
 
     def _extract_changed_files(self, diff: str) -> List[str]:
