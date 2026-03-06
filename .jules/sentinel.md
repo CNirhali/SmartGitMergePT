@@ -32,3 +32,8 @@
 **Vulnerability:** The `AgenticTracker` was capturing and saving raw webcam images of developers and storing session activity in a local database without proper Git exclusion, creating a high risk of sensitive biometric and activity data being accidentally committed and exposed.
 **Learning:** Automated tracking systems that capture personal data must have robust privacy controls integrated from the start, including automatic sanitization (e.g., face blurring) and strict repository hygiene (e.g., `.gitignore`).
 **Prevention:** Implement automatic face blurring for biometric data at the point of capture and ensure all tracking artifacts, logs, and local databases are explicitly ignored by version control.
+
+## 2026-03-06 - [Insecure Password-Based Encryption]
+**Vulnerability:** `DataEncryption` used a hardcoded static salt and only 100,000 PBKDF2 iterations for password-derived keys, making it vulnerable to precomputed rainbow tables and efficient brute-force attacks.
+**Learning:** Static salts negate the benefits of salting against rainbow tables when the same salt is used across all users/installations. Iteration counts should be periodically reviewed against modern recommendations (e.g., OWASP).
+**Prevention:** Use a unique, random salt (minimum 16 bytes) for every encryption operation. Store the salt alongside the ciphertext (e.g., using a versioned prefix format like `[version][salt][ciphertext]`) to ensure backward compatibility while allowing for future cryptographic upgrades.
