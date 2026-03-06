@@ -240,42 +240,55 @@ class InputValidator:
         return text
 
 class DataEncryption:
-    """Data encryption and decryption utilities"""
+    """Data encryption and decryption utilities with versioned random salts"""
     
     def __init__(self, key: Optional[str] = None):
-        if key:
-            self.key = self._derive_key(key)
-        else:
-            self.key = Fernet.generate_key()
-        
-        self.cipher = Fernet(self.key)
+        self.password = key
+        self.legacy_salt = b'smartgit_salt_2024'
+        if not key:
+            self.static_key = Fernet.generate_key()
+            self.cipher = Fernet(self.static_key)
     
-    def _derive_key(self, password: str) -> bytes:
-        """Derive encryption key from password"""
-        salt = b'smartgit_salt_2024'  # In production, use random salt
+    def _derive_key(self, password: str, salt: bytes, iterations: int = 600000) -> bytes:
+        """Derive encryption key from password and salt"""
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
-            iterations=100000,
+            iterations=iterations,
         )
         return base64.urlsafe_b64encode(kdf.derive(password.encode()))
     
     def encrypt(self, data: str) -> str:
-        """Encrypt string data"""
+        """Encrypt string data with version prefix and random salt for password keys"""
         try:
-            encrypted = self.cipher.encrypt(data.encode())
-            return base64.urlsafe_b64encode(encrypted).decode()
+            if self.password:
+                salt = os.urandom(16)
+                key = self._derive_key(self.password, salt)
+                cipher = Fernet(key)
+                # Decode Fernet token to raw bytes to avoid double base64 encoding
+                raw_encrypted = base64.urlsafe_b64decode(cipher.encrypt(data.encode()))
+                return base64.urlsafe_b64encode(b'\x01' + salt + raw_encrypted).decode()
+            return self.cipher.encrypt(data.encode()).decode()
         except Exception as e:
             logger.error(f"Encryption failed: {e}")
             raise
     
     def decrypt(self, encrypted_data: str) -> str:
-        """Decrypt string data"""
+        """Decrypt string data, supporting versioned salts and legacy formats"""
         try:
-            encrypted_bytes = base64.urlsafe_b64decode(encrypted_data.encode())
-            decrypted = self.cipher.decrypt(encrypted_bytes)
-            return decrypted.decode()
+            if self.password:
+                decoded = base64.urlsafe_b64decode(encrypted_data.encode())
+                if len(decoded) > 17 and decoded[0] == 1:  # Version 1: [v1][salt][data]
+                    salt, raw_data = decoded[1:17], decoded[17:]
+                    key = self._derive_key(self.password, salt)
+                    return Fernet(key).decrypt(base64.urlsafe_b64encode(raw_data)).decode()
+                # Legacy fallback: try old format (static salt, iterations=100k)
+                key = self._derive_key(self.password, self.legacy_salt, iterations=100000)
+                try: return Fernet(key).decrypt(decoded).decode()
+                except: return Fernet(key).decrypt(base64.urlsafe_b64decode(decoded)).decode()
+            try: return self.cipher.decrypt(encrypted_data.encode()).decode()
+            except: return self.cipher.decrypt(base64.urlsafe_b64decode(encrypted_data.encode())).decode()
         except Exception as e:
             logger.error(f"Decryption failed: {e}")
             raise

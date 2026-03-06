@@ -153,6 +153,48 @@ class TestDataEncryption:
         
         assert decrypted == original_data
 
+    def test_random_salt_for_password_encryption(self):
+        """Test that multiple encryptions with the same password result in different ciphertexts (due to random salt)"""
+        password = "secret_password"
+        encryption = DataEncryption(password)
+        data = "some important data"
+
+        encrypted1 = encryption.encrypt(data)
+        encrypted2 = encryption.encrypt(data)
+
+        assert encrypted1 != encrypted2
+        assert encryption.decrypt(encrypted1) == data
+        assert encryption.decrypt(encrypted2) == data
+
+    def test_legacy_encryption_compatibility(self):
+        """Test compatibility with legacy encryption format (static salt, 100k iterations, double base64)"""
+        import base64
+        from cryptography.fernet import Fernet
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+        password = "legacy_password"
+        salt = b'smartgit_salt_2024'
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        legacy_key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
+
+        original_data = "legacy_secret"
+        cipher = Fernet(legacy_key)
+        # Legacy format had double base64 encoding for password-based encryption
+        encrypted = cipher.encrypt(original_data.encode())
+        legacy_ciphertext = base64.urlsafe_b64encode(encrypted).decode()
+
+        # New implementation should be able to decrypt it
+        encryption = DataEncryption(password)
+        decrypted = encryption.decrypt(legacy_ciphertext)
+
+        assert decrypted == original_data
+
 class TestPerformanceMonitor:
     """Test performance monitoring functionality"""
     
