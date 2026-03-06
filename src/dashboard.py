@@ -33,6 +33,8 @@ template = '''
         .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; position: relative; }
         .branch-tag:hover { background: #cfeeff; border-color: #0969da; }
         .branch-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
+        .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
+        tr.highlight { background-color: #ddf4ff; }
         .copy-tooltip { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #24292f; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; }
         .copy-tooltip.show { opacity: 1; }
         kbd { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 3px; box-shadow: inset 0 -1px 0 #d0d7de; color: #24292f; font-family: ui-monospace, monospace; font-size: 11px; padding: 3px 5px; margin-left: 4px; }
@@ -132,7 +134,7 @@ template = '''
         </thead>
         <tbody>
             {% for pred in predictions %}
-            <tr>
+            <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}">
                 <td>
                     <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}</span>
                     <span style="color: #57606a; margin: 0 4px;">↔</span>
@@ -189,8 +191,21 @@ template = '''
             });
         }
 
+        function toggleHighlight(branch, active) {
+            document.querySelectorAll(`.branch-tag[data-branch="${branch}"]`).forEach(tag => {
+                tag.classList.toggle('highlight', active);
+            });
+            document.querySelectorAll(`tr[data-branch-a="${branch}"], tr[data-branch-b="${branch}"]`).forEach(row => {
+                row.classList.toggle('highlight', active);
+            });
+        }
+
         document.querySelectorAll('.branch-tag').forEach(tag => {
             tag.addEventListener('click', () => copyToClipboard(tag));
+            tag.addEventListener('mouseenter', () => toggleHighlight(tag.getAttribute('data-branch'), true));
+            tag.addEventListener('mouseleave', () => toggleHighlight(tag.getAttribute('data-branch'), false));
+            tag.addEventListener('focusin', () => toggleHighlight(tag.getAttribute('data-branch'), true));
+            tag.addEventListener('focusout', () => toggleHighlight(tag.getAttribute('data-branch'), false));
             tag.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -240,6 +255,11 @@ template = '''
             if (e.key === '/' && document.activeElement !== filterInput) {
                 e.preventDefault();
                 filterInput.focus();
+            }
+            if (e.key === 'Escape' && document.activeElement === filterInput) {
+                filterInput.value = '';
+                filterInput.dispatchEvent(new Event('input'));
+                filterInput.blur();
             }
         });
     </script>

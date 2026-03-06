@@ -9,3 +9,7 @@
 ## 2026-03-04 - [Domain-Specific Semantic Coloring]
 **Learning:** In conflict-monitoring dashboards, "Present" (detected conflicts) should be semantically red and "Absent" (clear) should be green, which may flip standard "active/inactive" conventions.
 **Action:** Always map CSS semantic classes to the user's emotional/actionable context (e.g., Warning/Danger for presence of problems) rather than just technical existence.
+
+## 2026-03-06 - [Cross-Highlighting and Keyboard Shortcuts]
+**Learning:** In data-heavy dashboards, "cross-highlighting" (visual correlation between different sections) significantly reduces cognitive load. Providing standard keyboard shortcuts like 'Escape' to clear search/filter inputs aligns with user expectations for professional tools.
+**Action:** Use data attributes to link related elements in the DOM for efficient JavaScript-based highlighting, and always implement 'Escape' to clear/blur active search inputs.
