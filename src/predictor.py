@@ -1,4 +1,5 @@
 from git_utils import GitUtils
+from optimizer import SmartCache, CacheConfig, CacheStrategy
 from typing import List, Dict, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import difflib
@@ -6,6 +7,12 @@ import difflib
 class ConflictPredictor:
     def __init__(self, repo_path: str = "."):
         self.git_utils = GitUtils(repo_path)
+        # BOLT: Initialize cache for branch metadata and semantic similarity
+        self.cache = SmartCache(CacheConfig(
+            strategy=CacheStrategy.TTL,
+            max_size=2000,
+            ttl_seconds=600  # 10 minutes cache
+        ))
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
         predictions = []
@@ -21,10 +28,27 @@ class ConflictPredictor:
             except:
                 main_branch = 'main'
 
+        # BOLT: Get main branch commit hash to ensure cache validity
+        try:
+            main_commit = self.git_utils.repo.commit(main_branch).hexsha
+        except:
+            main_commit = "unknown"
+
         # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch in parallel
         # This reduces Git operations from O(N^2) to O(N) where N is number of branches
         # Parallelization handles I/O-bound git process calls efficiently.
         def _fetch_branch_data(branch):
+            try:
+                commit_hash = self.git_utils.repo.commit(branch).hexsha
+            except:
+                commit_hash = "unknown"
+
+            # BOLT: Include main_commit hash in cache key to avoid stale results
+            cache_key = f"metadata:{branch}:{commit_hash}:{main_branch}:{main_commit}"
+            cached_data = self.cache.get(cache_key)
+            if cached_data:
+                return branch, cached_data
+
             if branch == main_branch:
                 diff = ""
             else:
@@ -33,12 +57,16 @@ class ConflictPredictor:
                     diff = self.git_utils.get_diff_between_branches(main_branch, branch, unified=0)
                 except:
                     diff = ""
+
             files, lines = self._get_diff_metadata(diff)
-            return branch, {
+            data = {
                 'diff': diff,
                 'files': files,
-                'lines': lines
+                'lines': lines,
+                'commit': commit_hash
             }
+            self.cache.set(cache_key, data)
+            return branch, data
 
         with ThreadPoolExecutor() as executor:
             results = list(executor.map(_fetch_branch_data, branches))
@@ -68,7 +96,14 @@ class ConflictPredictor:
                 # or if some files overlap to warrant deeper check
                 semantic_conflict = False
                 if not line_conflicts and overlap:
-                    semantic_conflict = self._semantic_similarity(data_a['diff'], data_b['diff'])
+                    # Use commit hashes in cache key for semantic similarity
+                    sim_key = f"sim:{data_a['commit']}:{data_b['commit']}"
+                    cached_sim = self.cache.get(sim_key)
+                    if cached_sim is not None:
+                        semantic_conflict = cached_sim
+                    else:
+                        semantic_conflict = self._semantic_similarity(data_a['diff'], data_b['diff'])
+                        self.cache.set(sim_key, semantic_conflict)
 
                 if overlap or line_conflicts or semantic_conflict:
                     predictions.append({
