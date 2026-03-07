@@ -157,8 +157,17 @@ class AgenticTracker:
     
     def register_developer(self, developer_id: str, name: str, face_image_path: str):
         """Register a new developer with their face encoding"""
+        # Validate face_image_path for path traversal (using realpath to resolve symlinks)
+        abs_repo_path = os.path.realpath(self.repo_path)
+        full_image_path = os.path.realpath(os.path.join(abs_repo_path, face_image_path))
+
+        # Check if the requested path is within the repository
+        if os.path.commonpath([abs_repo_path, full_image_path]) != abs_repo_path:
+            self.logger.warning(f"SECURITY: Path traversal attempt in register_developer: {face_image_path}")
+            raise ValueError("Invalid face image path: Path must be within the repository")
+
         # Load and encode face
-        image = face_recognition.load_image_file(face_image_path)
+        image = face_recognition.load_image_file(full_image_path)
         face_encodings = face_recognition.face_encodings(image)
         
         if not face_encodings:

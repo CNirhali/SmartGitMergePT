@@ -37,3 +37,8 @@
 **Vulnerability:** `DataEncryption` used a hardcoded static salt and only 100,000 PBKDF2 iterations for password-derived keys, making it vulnerable to precomputed rainbow tables and efficient brute-force attacks.
 **Learning:** Static salts negate the benefits of salting against rainbow tables when the same salt is used across all users/installations. Iteration counts should be periodically reviewed against modern recommendations (e.g., OWASP).
 **Prevention:** Use a unique, random salt (minimum 16 bytes) for every encryption operation. Store the salt alongside the ciphertext (e.g., using a versioned prefix format like `[version][salt][ciphertext]`) to ensure backward compatibility while allowing for future cryptographic upgrades.
+
+## 2026-03-07 - [Path Traversal via Symlinks in Agentic Tracker]
+**Vulnerability:** `AgenticTracker.register_developer` was vulnerable to path traversal, allowing arbitrary file reads. Initial fix using `os.path.abspath` was insufficient as it didn't resolve symbolic links.
+**Learning:** `os.path.abspath` only resolves `..` segments but leaves symlinks intact, potentially allowing traversal if a symlink in the repo points outside. `os.path.realpath` is required for robust validation.
+**Prevention:** Always use `os.path.realpath` before checking if a path is within the intended base directory using `os.path.commonpath`.
