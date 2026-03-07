@@ -13,6 +13,7 @@ template = '''
     <meta charset="UTF-8">
     <title>SmartGitMergePT Dashboard</title>
     <style>
+        html { scroll-behavior: smooth; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; margin: 2em; line-height: 1.5; color: #24292f; }
         table { border-collapse: collapse; width: 100%; max-width: 900px; margin-top: 1em; }
         th, td { border: 1px solid #d0d7de; padding: 12px; text-align: left; }
@@ -84,6 +85,7 @@ template = '''
 
     <div class="filter-container">
         <input type="text" id="filter-input" class="filter-input" placeholder="Filter branches or conflicts... (Press '/' to focus)" aria-label="Filter branches or conflicts">
+        <span id="filter-results-count" style="margin-left: 10px; font-size: 0.9em; color: #57606a;" aria-live="polite"></span>
     </div>
 
     <div class="summary">
@@ -92,7 +94,7 @@ template = '''
         </div>
         <div class="summary-item">
             <strong>Conflict Pairs</strong>:
-            <span class="badge {{ 'badge-error' if predictions else 'badge-success' }}">
+            <span class="badge {{ 'badge-error' if predictions else 'badge-success' }}" aria-label="{{ predictions|length }} conflicts detected">
                 {{ predictions|length }}
             </span>
         </div>
@@ -108,15 +110,15 @@ template = '''
     <h2>Scenario Types</h2>
     <ul style="list-style: none; padding-left: 0;">
         <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}">
-            {% if scenario_types['file_overlap'] %}⚠️{% else %}✅{% endif %}
+            {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning">⚠️</span>{% else %}<span role="img" aria-label="Clear">✅</span>{% endif %}
             <strong>File Overlap</strong>: Both branches modify the same file(s).
         </li>
         <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}">
-            {% if scenario_types['line_overlap'] %}⚠️{% else %}✅{% endif %}
+            {% if scenario_types['line_overlap'] %}<span role="img" aria-label="Warning">⚠️</span>{% else %}<span role="img" aria-label="Clear">✅</span>{% endif %}
             <strong>Line Overlap</strong>: Both branches change the same or similar lines in a file.
         </li>
         <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}">
-            {% if scenario_types['semantic_conflict'] %}⚠️{% else %}✅{% endif %}
+            {% if scenario_types['semantic_conflict'] %}<span role="img" aria-label="Warning">⚠️</span>{% else %}<span role="img" aria-label="Clear">✅</span>{% endif %}
             <strong>Semantic Conflict</strong>: Changes are different but may cause logical or functional conflicts.
         </li>
     </ul>
@@ -215,6 +217,7 @@ template = '''
         });
 
         const filterInput = document.getElementById('filter-input');
+        const resultsCount = document.getElementById('filter-results-count');
         const monitoredBranchTags = document.querySelectorAll('#monitored-branches-list .branch-tag');
         const tableRows = document.querySelectorAll('tbody tr');
         const noResults = document.createElement('div');
@@ -228,7 +231,7 @@ template = '''
 
         filterInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
-            let hasVisibleRows = false;
+            let visibleRowsCount = 0;
 
             monitoredBranchTags.forEach(tag => {
                 const text = tag.getAttribute('data-branch').toLowerCase();
@@ -239,13 +242,30 @@ template = '''
                 const text = row.textContent.toLowerCase();
                 const isVisible = text.includes(query);
                 row.style.display = isVisible ? '' : 'none';
-                if (isVisible) hasVisibleRows = true;
+                if (isVisible) visibleRowsCount++;
             });
 
-            if (table) {
-                table.style.display = hasVisibleRows ? '' : 'none';
-                noResults.style.display = (!hasVisibleRows && query !== '') ? 'block' : 'none';
+            if (query === '') {
+                resultsCount.textContent = '';
+            } else {
+                resultsCount.textContent = `Showing ${visibleRowsCount} matching conflict${visibleRowsCount !== 1 ? 's' : ''}`;
             }
+
+            if (table) {
+                table.style.display = visibleRowsCount > 0 ? '' : 'none';
+                noResults.style.display = (visibleRowsCount === 0 && query !== '') ? 'block' : 'none';
+            }
+        });
+
+        tableRows.forEach(row => {
+            const highlightRow = (active) => {
+                toggleHighlight(row.getAttribute('data-branch-a'), active);
+                toggleHighlight(row.getAttribute('data-branch-b'), active);
+            };
+            row.addEventListener('mouseenter', () => highlightRow(true));
+            row.addEventListener('mouseleave', () => highlightRow(false));
+            row.addEventListener('focusin', () => highlightRow(true));
+            row.addEventListener('focusout', () => highlightRow(false));
         });
 
         document.addEventListener('keydown', (e) => {
