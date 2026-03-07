@@ -17,3 +17,19 @@
 ## 2025-05-25 - [Parallelizing Git Subprocesses]
 **Learning:** Fetching Git diffs for multiple branches is I/O-bound due to external process overhead. Sequential execution creates significant latency that scales linearly with the number of branches.
 **Action:** Use `ThreadPoolExecutor` to parallelize I/O-bound `git` command calls. This can yield ~50% performance gains in data preparation phases for large branch sets.
+
+## 2025-05-30 - [Targeted Pairwise Comparison via Inverted Index]
+**Learning:** Naive pairwise comparison of $ branches is (N^2)$, which is devastating for performance in large repositories. Using an inverted index (mapping files to branches that modified them) reduces the search space to only those pairs that actually share modified files.
+**Action:** When performing exhaustive pairwise checks on objects with shared attributes, always build an inverted index first to isolate relevant pairs.
+
+## 2025-05-30 - [Context-Aware Semantic Similarity]
+**Learning:** Running  on entire diff strings is wasteful and slow, especially when only a small portion of the diff (the overlapping files) is relevant to the conflict prediction. Trimming the input to only overlapping file content significantly improves execution speed and heuristic focus.
+**Action:** Always filter and minimize input size for expensive string comparison algorithms like  to focus on the specific segments that matter.
+
+## 2025-05-30 - [Targeted Pairwise Comparison via Inverted Index]
+**Learning:** Naive pairwise comparison of $N$ branches is $O(N^2)$, which is devastating for performance in large repositories. Using an inverted index (mapping files to branches that modified them) reduces the search space to only those pairs that actually share modified files.
+**Action:** When performing exhaustive pairwise checks on objects with shared attributes, always build an inverted index first to isolate relevant pairs.
+
+## 2025-05-30 - [Context-Aware Semantic Similarity]
+**Learning:** Running `difflib.SequenceMatcher` on entire diff strings is wasteful and slow, especially when only a small portion of the diff (the overlapping files) is relevant to the conflict prediction. Trimming the input to only overlapping file content significantly improves execution speed and heuristic focus.
+**Action:** Always filter and minimize input size for expensive string comparison algorithms like `SequenceMatcher` to focus on the specific segments that matter.

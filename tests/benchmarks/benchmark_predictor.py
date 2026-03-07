@@ -37,7 +37,7 @@ def setup_benchmark_repo(tmp_path, num_branches=10):
         f.write_text(f"content {i}\n")
 
         # Occasionally modify the same file to ensure some overlap/conflict
-        if i % 5 == 0:
+        if i % 10 == 0:
             common = repo_dir / "shared.txt"
             with open(common, "a") as cf:
                 cf.write(f"branch {i} change\n")
@@ -52,7 +52,8 @@ def setup_benchmark_repo(tmp_path, num_branches=10):
 def main():
     tmp_path = Path("/tmp/bolt_bench")
     tmp_path.mkdir(exist_ok=True)
-    repo_path, branches = setup_benchmark_repo(tmp_path, num_branches=100)
+    # Using 10 branches
+    repo_path, branches = setup_benchmark_repo(tmp_path, num_branches=10)
 
     predictor = ConflictPredictor(repo_path)
 

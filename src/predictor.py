@@ -73,46 +73,69 @@ class ConflictPredictor:
 
         branch_data = dict(results)
 
-        for i, branch_a in enumerate(branches):
-            if branch_a == main_branch:
+        # BOLT: Build a file-to-branches index to optimize pairwise comparison
+        # This transforms the O(N^2) search into a more efficient targeted check
+        file_to_branches = {}
+        for branch, data in branch_data.items():
+            if branch == main_branch:
                 continue
-            data_a = branch_data[branch_a]
-            for branch_b in branches[i+1:]:
-                if branch_b == main_branch:
-                    continue
-                data_b = branch_data[branch_b]
+            for file in data['files']:
+                if file not in file_to_branches:
+                    file_to_branches[file] = []
+                file_to_branches[file].append(branch)
 
-                overlap = data_a['files'] & data_b['files']
+        # BOLT: Only check pairs of branches that actually share at least one modified file
+        seen_pairs = set()
+        for common_file, sharers in file_to_branches.items():
+            for i, branch_a in enumerate(sharers):
+                for branch_b in sharers[i+1:]:
+                    pair = tuple(sorted((branch_a, branch_b)))
+                    if pair in seen_pairs:
+                        continue
+                    seen_pairs.add(pair)
 
-                # BOLT: Using pre-calculated line sets per file
-                # Only check line-level overlap for files that both branches modified
-                line_conflicts = False
-                for common_file in overlap:
-                    if data_a['lines'].get(common_file) & data_b['lines'].get(common_file):
-                        line_conflicts = True
-                        break
+                    data_a = branch_data[branch_a]
+                    data_b = branch_data[branch_b]
 
-                # BOLT: Semantic similarity is slow, only check if there's no overlap already
-                # or if some files overlap to warrant deeper check
-                semantic_conflict = False
-                if not line_conflicts and overlap:
-                    # Use commit hashes in cache key for semantic similarity
-                    sim_key = f"sim:{data_a['commit']}:{data_b['commit']}"
-                    cached_sim = self.cache.get(sim_key)
-                    if cached_sim is not None:
-                        semantic_conflict = cached_sim
-                    else:
-                        semantic_conflict = self._semantic_similarity(data_a['diff'], data_b['diff'])
-                        self.cache.set(sim_key, semantic_conflict)
+                    # Recalculate full overlap for this specific pair
+                    overlap = data_a['files'] & data_b['files']
 
-                if overlap or line_conflicts or semantic_conflict:
-                    predictions.append({
-                        'branches': (branch_a, branch_b),
-                        'files': list(overlap),
-                        'line_conflicts': line_conflicts,
-                        'semantic_conflict': semantic_conflict,
-                        'conflict_likely': bool(overlap or line_conflicts or semantic_conflict)
-                    })
+                    # BOLT: Using pre-calculated line sets per file
+                    # Only check line-level overlap for files that both branches modified
+                    line_conflicts = False
+                    for common_f in overlap:
+                        if data_a['lines'].get(common_f) & data_b['lines'].get(common_f):
+                            line_conflicts = True
+                            break
+
+                    # BOLT: Semantic similarity is slow, only check if there's no line overlap
+                    # but files still overlap. Optimized to only compare overlapping file content.
+                    semantic_conflict = False
+                    if not line_conflicts:
+                        # Use commit hashes in cache key for semantic similarity
+                        sim_key = f"sim:{data_a['commit']}:{data_b['commit']}"
+                        cached_sim = self.cache.get(sim_key)
+                        if cached_sim is not None:
+                            semantic_conflict = cached_sim
+                        else:
+                            # BOLT: We only care about similarity in overlapping files
+                            # This significantly reduces the size of the input to SequenceMatcher
+                            # Using sorted() to ensure deterministic comparison strings
+                            sorted_overlap = sorted(overlap)
+                            diff_content_a = "\n".join(["\n".join(sorted(data_a['lines'].get(f, []))) for f in sorted_overlap])
+                            diff_content_b = "\n".join(["\n".join(sorted(data_b['lines'].get(f, []))) for f in sorted_overlap])
+
+                            semantic_conflict = self._semantic_similarity(diff_content_a, diff_content_b)
+                            self.cache.set(sim_key, semantic_conflict)
+
+                    if overlap or line_conflicts or semantic_conflict:
+                        predictions.append({
+                            'branches': pair,
+                            'files': list(overlap),
+                            'line_conflicts': line_conflicts,
+                            'semantic_conflict': semantic_conflict,
+                            'conflict_likely': True
+                        })
         return predictions
 
     def _get_diff_metadata(self, diff: str) -> Tuple[Set[str], Dict[str, Set[str]]]:
