@@ -114,7 +114,7 @@ class MistralCodeReviewer:
                 check=True
             )
             return [f.strip() for f in result.stdout.splitlines() if f.strip()]
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             logger.error(f"Error getting staged files: {e}")
             return []
     
@@ -132,10 +132,10 @@ class MistralCodeReviewer:
         """Review a single file"""
         try:
             # Get file content and validate path for security
-            abs_repo_path = os.path.abspath(self.repo_path)
-            full_path = os.path.abspath(os.path.join(abs_repo_path, file_path))
+            abs_repo_path = os.path.realpath(self.repo_path)
+            full_path = os.path.realpath(os.path.join(abs_repo_path, file_path))
 
-            # Prevent path traversal
+            # Prevent path traversal (realpath resolves symlinks to their actual targets)
             if os.path.commonpath([abs_repo_path, full_path]) != abs_repo_path:
                 logger.warning(f"Path traversal attempt detected: {file_path}")
                 return self._create_empty_result(file_path, "Error: Path traversal attempt detected")

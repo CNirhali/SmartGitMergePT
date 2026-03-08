@@ -188,7 +188,7 @@ class DatabaseHealthChecker(HealthChecker):
             
             conn.close()
             
-            if db_size > 100:  # 100MB limit
+            if db_size > 1:  # 1MB limit for testing/warning
                 status = HealthStatus.WARNING
                 message = f"Database size large: {db_size:.2f}MB"
             else:

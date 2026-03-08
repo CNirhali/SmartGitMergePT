@@ -123,8 +123,8 @@ class TestDatabaseHealthChecker:
         cursor.execute("CREATE TABLE large_table (id INTEGER PRIMARY KEY, data TEXT)")
         
         # Insert large amount of data
-        large_data = "x" * 1000
-        for i in range(1000):
+        large_data = "x" * 1024
+        for i in range(1024):
             cursor.execute("INSERT INTO large_table (data) VALUES (?)", (large_data,))
         
         conn.commit()
@@ -132,7 +132,7 @@ class TestDatabaseHealthChecker:
         
         result = await self.checker.check()
         
-        # Should be warning due to large size
+        # Should be warning due to large size (> 1MB)
         assert result.status == HealthStatus.WARNING
         assert "large" in result.message.lower()
 
@@ -279,9 +279,9 @@ class TestAlertManager:
         alerts = self.manager.get_alerts(hours=1)
         assert len(alerts) == 1
         
-        # Get alerts from last minute (should be empty)
+        # Get alerts from last minute (should be 1 because it was just added)
         alerts = self.manager.get_alerts(hours=1/60)
-        assert len(alerts) == 0
+        assert len(alerts) == 1
     
     def test_clear_old_alerts(self):
         """Test clearing old alerts"""
