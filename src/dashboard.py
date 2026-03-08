@@ -35,6 +35,9 @@ template = '''
         .branch-tag:hover { background: #cfeeff; border-color: #0969da; }
         .branch-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
+        .file-tag { cursor: pointer; transition: background-color 0.2s; }
+        .file-tag:hover { background: #afb8c166; }
+        .file-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
         tr.highlight { background-color: #ddf4ff; }
         .copy-tooltip { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #24292f; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; }
         .copy-tooltip.show { opacity: 1; }
@@ -80,12 +83,13 @@ template = '''
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <button class="refresh-btn" onclick="refresh()" aria-label="Refresh conflict predictions (Press 'r')">Refresh<kbd>r</kbd></button>
-    <div class="timestamp">Last updated: {{ now.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+    <div class="timestamp">Last updated: <time datetime="{{ now.isoformat() }}">{{ now.strftime('%Y-%m-%d %H:%M:%S') }} UTC</time></div>
     <h1 id="main-content">SmartGitMergePT Dashboard</h1>
 
-    <div class="filter-container">
+    <div class="filter-container" style="display: flex; align-items: center; gap: 8px;">
         <input type="text" id="filter-input" class="filter-input" placeholder="Filter branches or conflicts... (Press '/' to focus)" aria-label="Filter branches or conflicts">
-        <span id="filter-results-count" style="margin-left: 10px; font-size: 0.9em; color: #57606a;" aria-live="polite"></span>
+        <button id="clear-filter" class="refresh-btn" style="margin-bottom: 0; padding: 4px 8px; display: none;" aria-label="Clear filter (Press 'Esc')">Clear<kbd>Esc</kbd></button>
+        <span id="filter-results-count" style="font-size: 0.9em; color: #57606a;" aria-live="polite"></span>
     </div>
 
     <div class="summary">
@@ -145,24 +149,24 @@ template = '''
                 <td>
                     {% if pred['files'] %}
                         {% for file in pred['files'] %}
-                            <code>{{ file }}</code>{% if not loop.last %}, {% endif %}
+                            <code class="file-tag" role="button" tabindex="0" aria-label="Click to copy file path: {{ file }}" data-copy="{{ file }}">{{ file }}</code>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     {% else %}
-                        <span class="absent">—</span>
+                        <span class="absent" aria-label="No files overlap">—</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if pred['line_conflicts'] %}
-                        <span class="badge badge-error">⚠️ Yes</span>
+                        <span class="badge badge-error" aria-label="Line overlap detected">⚠️ Yes</span>
                     {% else %}
-                        <span class="absent">—</span>
+                        <span class="absent" aria-label="No line overlap detected">—</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if pred['semantic_conflict'] %}
-                        <span class="badge badge-error">⚠️ Yes</span>
+                        <span class="badge badge-error" aria-label="Semantic conflict detected">⚠️ Yes</span>
                     {% else %}
-                        <span class="absent">—</span>
+                        <span class="absent" aria-label="No semantic conflict detected">—</span>
                     {% endif %}
                 </td>
             </tr>
@@ -181,8 +185,8 @@ template = '''
             window.location.reload();
         }
 
-        function copyToClipboard(element) {
-            const text = element.getAttribute('data-branch');
+        function copyToClipboard(element, attr = 'data-branch') {
+            const text = element.getAttribute(attr);
             if (element.querySelector('.copy-tooltip')) return;
             navigator.clipboard.writeText(text).then(() => {
                 const tooltip = document.createElement('div');
@@ -202,21 +206,26 @@ template = '''
             });
         }
 
-        document.querySelectorAll('.branch-tag').forEach(tag => {
-            tag.addEventListener('click', () => copyToClipboard(tag));
-            tag.addEventListener('mouseenter', () => toggleHighlight(tag.getAttribute('data-branch'), true));
-            tag.addEventListener('mouseleave', () => toggleHighlight(tag.getAttribute('data-branch'), false));
-            tag.addEventListener('focusin', () => toggleHighlight(tag.getAttribute('data-branch'), true));
-            tag.addEventListener('focusout', () => toggleHighlight(tag.getAttribute('data-branch'), false));
+        document.querySelectorAll('.branch-tag, .file-tag').forEach(tag => {
+            const isFile = tag.classList.contains('file-tag');
+            const attr = isFile ? 'data-copy' : 'data-branch';
+            tag.addEventListener('click', () => copyToClipboard(tag, attr));
+            if (!isFile) {
+                tag.addEventListener('mouseenter', () => toggleHighlight(tag.getAttribute('data-branch'), true));
+                tag.addEventListener('mouseleave', () => toggleHighlight(tag.getAttribute('data-branch'), false));
+                tag.addEventListener('focusin', () => toggleHighlight(tag.getAttribute('data-branch'), true));
+                tag.addEventListener('focusout', () => toggleHighlight(tag.getAttribute('data-branch'), false));
+            }
             tag.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    copyToClipboard(tag);
+                    copyToClipboard(tag, attr);
                 }
             });
         });
 
         const filterInput = document.getElementById('filter-input');
+        const clearFilterBtn = document.getElementById('clear-filter');
         const resultsCount = document.getElementById('filter-results-count');
         const monitoredBranchTags = document.querySelectorAll('#monitored-branches-list .branch-tag');
         const tableRows = document.querySelectorAll('tbody tr');
@@ -232,6 +241,7 @@ template = '''
         filterInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
             let visibleRowsCount = 0;
+            clearFilterBtn.style.display = query ? 'inline-block' : 'none';
 
             monitoredBranchTags.forEach(tag => {
                 const text = tag.getAttribute('data-branch').toLowerCase();
@@ -257,6 +267,12 @@ template = '''
             }
         });
 
+        clearFilterBtn.addEventListener('click', () => {
+            filterInput.value = '';
+            filterInput.dispatchEvent(new Event('input'));
+            filterInput.focus();
+        });
+
         tableRows.forEach(row => {
             const highlightRow = (active) => {
                 toggleHighlight(row.getAttribute('data-branch-a'), active);
@@ -276,10 +292,14 @@ template = '''
                 e.preventDefault();
                 filterInput.focus();
             }
-            if (e.key === 'Escape' && document.activeElement === filterInput) {
-                filterInput.value = '';
-                filterInput.dispatchEvent(new Event('input'));
-                filterInput.blur();
+            if (e.key === 'Escape') {
+                if (filterInput.value !== '') {
+                    filterInput.value = '';
+                    filterInput.dispatchEvent(new Event('input'));
+                }
+                if (document.activeElement === filterInput) {
+                    filterInput.blur();
+                }
             }
         });
     </script>
