@@ -151,12 +151,12 @@ class InputValidator:
     def validate_path(self, path: str, base_path: str) -> Tuple[bool, str]:
         """Validate file path for security"""
         try:
-            # Normalize paths
-            normalized_path = os.path.normpath(path)
-            normalized_base = os.path.normpath(base_path)
+            # Normalize paths and resolve symlinks using realpath
+            normalized_path = os.path.realpath(path)
+            normalized_base = os.path.realpath(base_path)
             
-            # Check if path is within base directory
-            if os.path.commonpath([os.path.abspath(normalized_base), os.path.abspath(normalized_path)]) != os.path.abspath(normalized_base):
+            # Check if resolved path is within base directory
+            if os.path.commonpath([normalized_base, normalized_path]) != normalized_base:
                 return False, "Path traversal attempt detected"
             
             # Check for dangerous file extensions
