@@ -63,6 +63,7 @@ class ConflictPredictor:
                 'diff': diff,
                 'files': files,
                 'lines': lines,
+                'sorted_lines': {f: "\n".join(sorted(l)) for f, l in lines.items()},
                 'commit': commit_hash
             }
             self.cache.set(cache_key, data)
@@ -89,7 +90,8 @@ class ConflictPredictor:
         for common_file, sharers in file_to_branches.items():
             for i, branch_a in enumerate(sharers):
                 for branch_b in sharers[i+1:]:
-                    pair = tuple(sorted((branch_a, branch_b)))
+                    # BOLT: Faster pair creation without sorted()
+                    pair = (branch_a, branch_b) if branch_a < branch_b else (branch_b, branch_a)
                     if pair in seen_pairs:
                         continue
                     seen_pairs.add(pair)
@@ -120,10 +122,17 @@ class ConflictPredictor:
                         else:
                             # BOLT: We only care about similarity in overlapping files
                             # This significantly reduces the size of the input to SequenceMatcher
-                            # Using sorted() to ensure deterministic comparison strings
+                            # BOLT: Using pre-calculated sorted_lines strings with fallback for cache compatibility
                             sorted_overlap = sorted(overlap)
-                            diff_content_a = "\n".join(["\n".join(sorted(data_a['lines'].get(f, []))) for f in sorted_overlap])
-                            diff_content_b = "\n".join(["\n".join(sorted(data_b['lines'].get(f, []))) for f in sorted_overlap])
+
+                            def get_sorted_lines(data, file):
+                                # Fallback if cache is stale and missing 'sorted_lines'
+                                if 'sorted_lines' in data:
+                                    return data['sorted_lines'].get(file, "")
+                                return "\n".join(sorted(data['lines'].get(file, [])))
+
+                            diff_content_a = "\n".join([get_sorted_lines(data_a, f) for f in sorted_overlap])
+                            diff_content_b = "\n".join([get_sorted_lines(data_b, f) for f in sorted_overlap])
 
                             semantic_conflict = self._semantic_similarity(diff_content_a, diff_content_b)
                             self.cache.set(sim_key, semantic_conflict)
@@ -186,6 +195,10 @@ class ConflictPredictor:
         # BOLT: SequenceMatcher is expensive. Use quick_ratio for early rejection.
         if not diff_a or not diff_b:
             return False
+
+        # BOLT: Identity check for fast-path
+        if diff_a == diff_b:
+            return True
 
         seq = difflib.SequenceMatcher(None, diff_a, diff_b)
 
