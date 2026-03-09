@@ -14,7 +14,7 @@ import os
 import time
 import zlib
 from abc import ABC, abstractmethod
-from collections import defaultdict, OrderedDict
+from collections import defaultdict, OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
@@ -292,8 +292,8 @@ class ResourceManager:
     def __init__(self, memory_limit_mb: int = 512, cpu_limit_percent: int = 80):
         self.memory_limit_mb = memory_limit_mb
         self.cpu_limit_percent = cpu_limit_percent
-        self.memory_usage = []
-        self.cpu_usage = []
+        self.memory_usage = deque(maxlen=100)
+        self.cpu_usage = deque(maxlen=100)
         self.gc_stats = defaultdict(int)
         # Initialize CPU counter for non-blocking check_cpu_usage
         psutil.cpu_percent(interval=None)
@@ -310,10 +310,6 @@ class ResourceManager:
             'percent': memory.percent
         })
         
-        # Keep only last 100 entries
-        if len(self.memory_usage) > 100:
-            self.memory_usage.pop(0)
-        
         return is_healthy, usage_mb
     
     def check_cpu_usage(self) -> Tuple[bool, float]:
@@ -327,10 +323,6 @@ class ResourceManager:
             'usage_percent': cpu_percent
         })
         
-        # Keep only last 100 entries
-        if len(self.cpu_usage) > 100:
-            self.cpu_usage.pop(0)
-        
         return is_healthy, cpu_percent
     
     def optimize_memory(self):
@@ -341,11 +333,13 @@ class ResourceManager:
         self.gc_stats['objects_collected'] += collected
         
         # Clear memory usage history if too large
-        if len(self.memory_usage) > 50:
-            self.memory_usage = self.memory_usage[-25:]
+        # BOLT: Using deque with maxlen handles most trimming,
+        # but we can further reduce it if needed.
+        while len(self.memory_usage) > 25:
+            self.memory_usage.popleft()
         
-        if len(self.cpu_usage) > 50:
-            self.cpu_usage = self.cpu_usage[-25:]
+        while len(self.cpu_usage) > 25:
+            self.cpu_usage.popleft()
     
     def get_resource_stats(self) -> Dict[str, Any]:
         """Get resource usage statistics"""
@@ -357,13 +351,13 @@ class ResourceManager:
                 'healthy': memory_healthy,
                 'usage_mb': memory_usage,
                 'limit_mb': self.memory_limit_mb,
-                'history': self.memory_usage[-10:] if self.memory_usage else []
+                'history': list(self.memory_usage)[-10:] if self.memory_usage else []
             },
             'cpu': {
                 'healthy': cpu_healthy,
                 'usage_percent': cpu_usage,
                 'limit_percent': self.cpu_limit_percent,
-                'history': self.cpu_usage[-10:] if self.cpu_usage else []
+                'history': list(self.cpu_usage)[-10:] if self.cpu_usage else []
             },
             'gc': dict(self.gc_stats)
         }
