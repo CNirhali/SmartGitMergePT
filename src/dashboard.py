@@ -34,12 +34,15 @@ template = '''
         .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; position: relative; }
         .branch-tag:hover { background: #cfeeff; border-color: #0969da; }
         .branch-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
+        .branch-tag:active { background: #cfeeff; transform: translateY(1px); }
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
-        .file-tag { cursor: pointer; transition: background-color 0.2s; }
+        .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; }
         .file-tag:hover { background: #afb8c166; }
         .file-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
+        .file-tag:active { background: #afb8c188; transform: translateY(1px); }
+        .file-tag.highlight { background: #0969da; color: white; }
         tr.highlight { background-color: #ddf4ff; }
-        .copy-tooltip { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #24292f; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; }
+        .copy-tooltip { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #24292f; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; z-index: 1000; }
         .copy-tooltip.show { opacity: 1; }
         kbd { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 3px; box-shadow: inset 0 -1px 0 #d0d7de; color: #24292f; font-family: ui-monospace, monospace; font-size: 11px; padding: 3px 5px; margin-left: 4px; }
         .summary { display: flex; gap: 1em; margin: 1.5em 0; }
@@ -91,6 +94,7 @@ template = '''
         <button id="clear-filter" class="refresh-btn" style="margin-bottom: 0; padding: 4px 8px; display: none;" aria-label="Clear filter (Press 'Esc')">Clear<kbd>Esc</kbd></button>
         <span id="filter-results-count" style="font-size: 0.9em; color: #57606a;" aria-live="polite"></span>
     </div>
+    <div id="announcer" class="sr-only" aria-live="polite" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;"></div>
 
     <div class="summary">
         <div class="summary-item">
@@ -193,7 +197,16 @@ template = '''
                 tooltip.className = 'copy-tooltip show';
                 tooltip.textContent = 'Copied!';
                 element.appendChild(tooltip);
-                setTimeout(() => tooltip.remove(), 1000);
+
+                const announcer = document.getElementById('announcer');
+                if (announcer) {
+                    announcer.textContent = `Copied ${text} to clipboard`;
+                }
+
+                setTimeout(() => {
+                    tooltip.remove();
+                    if (announcer) announcer.textContent = '';
+                }, 1000);
             });
         }
 
@@ -206,16 +219,29 @@ template = '''
             });
         }
 
+        function toggleFileHighlight(file, active) {
+            document.querySelectorAll(`.file-tag[data-copy="${file}"]`).forEach(tag => {
+                tag.classList.toggle('highlight', active);
+            });
+        }
+
         document.querySelectorAll('.branch-tag, .file-tag').forEach(tag => {
             const isFile = tag.classList.contains('file-tag');
             const attr = isFile ? 'data-copy' : 'data-branch';
             tag.addEventListener('click', () => copyToClipboard(tag, attr));
-            if (!isFile) {
+
+            if (isFile) {
+                tag.addEventListener('mouseenter', () => toggleFileHighlight(tag.getAttribute('data-copy'), true));
+                tag.addEventListener('mouseleave', () => toggleFileHighlight(tag.getAttribute('data-copy'), false));
+                tag.addEventListener('focusin', () => toggleFileHighlight(tag.getAttribute('data-copy'), true));
+                tag.addEventListener('focusout', () => toggleFileHighlight(tag.getAttribute('data-copy'), false));
+            } else {
                 tag.addEventListener('mouseenter', () => toggleHighlight(tag.getAttribute('data-branch'), true));
                 tag.addEventListener('mouseleave', () => toggleHighlight(tag.getAttribute('data-branch'), false));
                 tag.addEventListener('focusin', () => toggleHighlight(tag.getAttribute('data-branch'), true));
                 tag.addEventListener('focusout', () => toggleHighlight(tag.getAttribute('data-branch'), false));
             }
+
             tag.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
