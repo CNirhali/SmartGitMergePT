@@ -616,15 +616,21 @@ def with_guardrails(guardrails: GuardrailsManager, input_validation: bool = True
         def wrapper(*args, **kwargs):
             # Input validation
             if input_validation:
+                new_args = []
                 for arg in args:
                     is_valid, validated_arg = guardrails.validate_input(arg)
                     if not is_valid:
                         raise ValueError(f"Invalid input: {validated_arg}")
+                    new_args.append(validated_arg)
+                args = tuple(new_args)
                 
+                new_kwargs = {}
                 for key, value in kwargs.items():
                     is_valid, validated_value = guardrails.validate_input(value)
                     if not is_valid:
                         raise ValueError(f"Invalid input for {key}: {validated_value}")
+                    new_kwargs[key] = validated_value
+                kwargs = new_kwargs
             
             # Rate limiting
             if rate_limiting:
