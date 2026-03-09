@@ -42,3 +42,8 @@
 **Vulnerability:** `AgenticTracker.register_developer` was vulnerable to path traversal, allowing arbitrary file reads. Initial fix using `os.path.abspath` was insufficient as it didn't resolve symbolic links.
 **Learning:** `os.path.abspath` only resolves `..` segments but leaves symlinks intact, potentially allowing traversal if a symlink in the repo points outside. `os.path.realpath` is required for robust validation.
 **Prevention:** Always use `os.path.realpath` before checking if a path is within the intended base directory using `os.path.commonpath`.
+
+## 2026-03-08 - [Bypassed Input Sanitization in with_guardrails Decorator]
+**Vulnerability:** The `with_guardrails` decorator performed input validation and sanitization but failed to pass the sanitized results to the decorated function, continuing to use the original potentially malicious inputs.
+**Learning:** Validating or sanitizing data without replacing the original reference in the execution flow makes the security check ineffective, leading to "security theater" where the code appears secure but isn't.
+**Prevention:** Always ensure that sanitized outputs from validation routines are explicitly reassigned to the variables being passed to downstream logic. In Python decorators, this requires rebinding the `args` and `kwargs` before the function call.
