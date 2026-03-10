@@ -36,12 +36,13 @@ template = '''
         .branch-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
         .branch-tag:active { background: #cfeeff; transform: translateY(1px); }
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
+        .branch-tag.has-conflict::after { content: '•'; color: #cf222e; margin-left: 4px; font-weight: bold; }
         .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; }
         .file-tag:hover { background: #afb8c166; }
         .file-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
         .file-tag:active { background: #afb8c188; transform: translateY(1px); }
         .file-tag.highlight { background: #0969da; color: white; }
-        tr.highlight { background-color: #ddf4ff; }
+        tr.highlight { background-color: #ddf4ff; border-left: 2px solid #0969da; }
         .copy-tooltip { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #24292f; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; z-index: 1000; }
         .copy-tooltip.show { opacity: 1; }
         kbd { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 3px; box-shadow: inset 0 -1px 0 #d0d7de; color: #24292f; font-family: ui-monospace, monospace; font-size: 11px; padding: 3px 5px; margin-left: 4px; }
@@ -111,7 +112,8 @@ template = '''
     <h2>Monitored Branches</h2>
     <div id="monitored-branches-list" style="margin-bottom: 2em;">
     {% for branch in branches %}
-        <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}" data-branch="{{ branch }}">{{ branch }}</span>
+        {% set has_conflict = branch in conflicting_branches %}
+        <span class="branch-tag {{ 'has-conflict' if has_conflict }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (has predicted conflicts)' if has_conflict }}" data-branch="{{ branch }}">{{ branch }}</span>
     {% endfor %}
     </div>
 
@@ -222,6 +224,9 @@ template = '''
         function toggleFileHighlight(file, active) {
             document.querySelectorAll(`.file-tag[data-copy="${file}"]`).forEach(tag => {
                 tag.classList.toggle('highlight', active);
+                // PALETTE: Highlight the entire conflict row when a file is hovered
+                const row = tag.closest('tr');
+                if (row) row.classList.toggle('highlight', active);
             });
         }
 
@@ -346,10 +351,16 @@ def dashboard():
         'line_overlap': any(pred['line_conflicts'] for pred in predictions),
         'semantic_conflict': any(pred['semantic_conflict'] for pred in predictions)
     }
+    # PALETTE: Identify branches with conflicts for at-a-glance status
+    conflicting_branches = set()
+    for pred in predictions:
+        conflicting_branches.update(pred['branches'])
+
     return render_template_string(
         template,
         branches=branches,
         predictions=predictions,
+        conflicting_branches=conflicting_branches,
         scenario_types=scenario_types,
         now=datetime.now(timezone.utc)
     )
