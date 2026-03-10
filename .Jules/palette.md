@@ -13,3 +13,7 @@
 ## 2026-03-06 - [Cross-Highlighting and Keyboard Shortcuts]
 **Learning:** In data-heavy dashboards, "cross-highlighting" (visual correlation between different sections) significantly reduces cognitive load. Providing standard keyboard shortcuts like 'Escape' to clear search/filter inputs aligns with user expectations for professional tools.
 **Action:** Use data attributes to link related elements in the DOM for efficient JavaScript-based highlighting, and always implement 'Escape' to clear/blur active search inputs.
+
+## 2026-03-10 - [Visual Conflict Cues & Accessible Status]
+**Learning:** In branch-heavy monitoring dashboards, providing a "secondary" visual cue like a status dot (`•`) next to branch tags in the primary list helps users identify points of interest without scanning the entire data table. Always complement these visual cues with updated ARIA labels (e.g., " (has conflicts)") to ensure accessibility parity.
+**Action:** Implement subtle pseudo-element indicators for status-driven tags and always append parenthetical status text to the `aria-label` of those same tags.
