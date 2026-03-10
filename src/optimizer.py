@@ -104,13 +104,20 @@ class SmartCache:
         if config.enable_persistence:
             self._load_persistent_cache()
     
+    def _get_cache_key(self, key: str) -> str:
+        """BOLT: Consistently use MD5 hash for internal keying to support preloading and memory efficiency"""
+        return hashlib.md5(key.encode()).hexdigest()
+
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
         try:
+            # BOLT: Use internal keying to match preloaded persistent cache
+            cache_key = self._get_cache_key(key)
+
             # Try memory cache first
-            if key in self.cache:
+            if cache_key in self.cache:
                 self.hits += 1
-                value = self.cache[key]
+                value = self.cache[cache_key]
                 # Always decompress if it's a compressed string for transparency
                 return self._decompress_value(value)
             
@@ -119,8 +126,8 @@ class SmartCache:
                 value = self._load_from_disk(key)
                 if value is not None:
                     self.hits += 1
-                    # Store in memory cache for consistency (keep internal state consistent)
-                    self.cache[key] = value
+                    # BOLT: Store using internal key to avoid redundant memory usage
+                    self.cache[cache_key] = value
                     # Return decompressed value
                     return self._decompress_value(value)
             
@@ -133,12 +140,15 @@ class SmartCache:
     def set(self, key: str, value: Any) -> bool:
         """Set value in cache"""
         try:
+            # BOLT: Use internal keying
+            cache_key = self._get_cache_key(key)
+
             # Compress if enabled
             if self.config.enable_compression:
                 value = self._compress_value(value)
             
             # Store in memory cache
-            self.cache[key] = value
+            self.cache[cache_key] = value
             
             # Store in persistent cache if enabled
             if self.config.enable_persistence:
@@ -152,8 +162,11 @@ class SmartCache:
     def delete(self, key: str) -> bool:
         """Delete value from cache"""
         try:
-            if key in self.cache:
-                del self.cache[key]
+            # BOLT: Use internal keying
+            cache_key = self._get_cache_key(key)
+
+            if cache_key in self.cache:
+                del self.cache[cache_key]
             
             if self.config.enable_persistence:
                 self._delete_from_disk(key)
