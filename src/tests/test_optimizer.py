@@ -116,7 +116,8 @@ class TestSmartCache:
         assert retrieved == large_string
 
         # Verify it is stored as compressed in the internal cache
-        internal_value = self.cache.cache["large_key"]
+        internal_key = self.cache._get_cache_key("large_key")
+        internal_value = self.cache.cache[internal_key]
         assert isinstance(internal_value, str)
         assert internal_value.startswith("ZLIB_COMPRESSED:")
     
