@@ -12,8 +12,11 @@ from guardrails import (
     GuardrailsManager, SecurityLevel, PerformanceLevel,
     InputValidator, RateLimiter, DataEncryption,
     PerformanceMonitor, SecurityMonitor, ErrorHandler,
-    with_guardrails, secure_function, resource_guard
+    with_guardrails, secure_function, resource_guard,
+    ensure_private_file, ensure_private_dir
 )
+import os
+from pathlib import Path
 
 class TestInputValidator:
     """Test input validation functionality"""
@@ -405,6 +408,42 @@ class TestDecorators:
         with resource_guard(self.manager, "test_resource"):
             # Should not raise any exceptions
             pass
+
+class TestPrivatePermissions:
+    """Test restrictive permissions enforcement"""
+
+    def test_ensure_private_file_permissions(self, tmp_path):
+        """Test that ensure_private_file correctly sets 0o600 permissions"""
+        test_file = tmp_path / "private_file.txt"
+
+        # Test creation
+        ensure_private_file(test_file)
+        assert test_file.exists()
+        mode = os.stat(test_file).st_mode
+        assert oct(mode & 0o777) == '0o600'
+
+        # Test update
+        test_file.chmod(0o644)
+        ensure_private_file(test_file)
+        mode = os.stat(test_file).st_mode
+        assert oct(mode & 0o777) == '0o600'
+
+    def test_ensure_private_dir_permissions(self, tmp_path):
+        """Test that ensure_private_dir correctly sets 0o700 permissions"""
+        test_dir = tmp_path / "private_dir"
+
+        # Test creation
+        ensure_private_dir(test_dir)
+        assert test_dir.exists()
+        assert test_dir.is_dir()
+        mode = os.stat(test_dir).st_mode
+        assert oct(mode & 0o777) == '0o700'
+
+        # Test update
+        test_dir.chmod(0o755)
+        ensure_private_dir(test_dir)
+        mode = os.stat(test_dir).st_mode
+        assert oct(mode & 0o777) == '0o700'
 
 class TestIntegration:
     """Integration tests for guardrails system"""

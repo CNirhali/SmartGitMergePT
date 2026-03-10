@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 import tempfile
 from pathlib import Path
+from guardrails import ensure_private_file, ensure_private_dir
 
 class ActivityType(Enum):
     CODING = "coding"
@@ -81,6 +82,7 @@ class AgenticTracker:
     
     def _setup_database(self):
         """Initialize SQLite database for tracking data"""
+        ensure_private_file(self.db_path)
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -130,11 +132,13 @@ class AgenticTracker:
     
     def _setup_logging(self):
         """Setup logging configuration"""
+        log_file = os.path.join(self.repo_path, 'tracker.log')
+        ensure_private_file(log_file)
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(os.path.join(self.repo_path, 'tracker.log')),
+                logging.FileHandler(log_file),
                 logging.StreamHandler()
             ]
         )
@@ -415,24 +419,28 @@ class AgenticTracker:
         return True  # Placeholder
     
     def _save_screenshot(self, screenshot) -> str:
-        """Save screenshot to disk"""
+        """Save screenshot to disk with restrictive permissions"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"screenshot_{timestamp}.png"
-        filepath = os.path.join(self.repo_path, "tracking_data", "screenshots", filename)
+        dir_path = os.path.join(self.repo_path, "tracking_data", "screenshots")
+        filepath = os.path.join(dir_path, filename)
         
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        ensure_private_dir(dir_path)
         screenshot.save(filepath)
+        ensure_private_file(filepath)
         
         return filepath
     
     def _save_webcam_image(self, frame) -> str:
-        """Save webcam image to disk"""
+        """Save webcam image to disk with restrictive permissions"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"webcam_{timestamp}.png"
-        filepath = os.path.join(self.repo_path, "tracking_data", "webcam", filename)
+        dir_path = os.path.join(self.repo_path, "tracking_data", "webcam")
+        filepath = os.path.join(dir_path, filename)
         
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        ensure_private_dir(dir_path)
         cv2.imwrite(filepath, frame)
+        ensure_private_file(filepath)
         
         return filepath
     
