@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import weakref
 
 import psutil
+from guardrails import ensure_private_file, ensure_private_dir
 from cachetools import TTLCache, LRUCache
 import aiofiles
 import aiohttp
@@ -84,7 +85,7 @@ class SmartCache:
     def __init__(self, config: CacheConfig):
         self.config = config
         self.cache_dir = Path(config.cache_dir)
-        self.cache_dir.mkdir(exist_ok=True)
+        ensure_private_dir(self.cache_dir)
         
         # Initialize cache based on strategy
         if config.strategy == CacheStrategy.LRU:
@@ -214,9 +215,10 @@ class SmartCache:
         return None
     
     def _save_to_disk(self, key: str, value: Any):
-        """Save value to disk cache"""
+        """Save value to disk cache with restrictive permissions"""
         try:
             cache_file = self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.cache"
+            ensure_private_file(cache_file)
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(value, f, cls=SmartJSONEncoder)
         except Exception as e:

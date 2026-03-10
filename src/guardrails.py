@@ -239,6 +239,20 @@ class InputValidator:
         text = html.escape(text)
         return text
 
+def ensure_private_file(path: Union[str, Path]):
+    """Ensure a file exists and has restrictive (0o600) permissions"""
+    path = Path(path)
+    if not path.exists():
+        path.touch()
+    os.chmod(path, 0o600)
+
+def ensure_private_dir(path: Union[str, Path]):
+    """Ensure a directory exists and has restrictive (0o700) permissions"""
+    path = Path(path)
+    if not path.exists():
+        path.mkdir(parents=True, exist_ok=True)
+    os.chmod(path, 0o700)
+
 class DataEncryption:
     """Data encryption and decryption utilities with versioned random salts"""
     

@@ -3,6 +3,7 @@ import os
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from guardrails import ensure_private_file
 
 @dataclass
 class TrackingConfig:
@@ -104,7 +105,7 @@ class ConfigManager:
                 print("   Using default configuration")
     
     def save_config(self):
-        """Save current configuration to file"""
+        """Save current configuration to file with restrictive permissions"""
         try:
             config_data = {
                 'tracking': asdict(self.tracking),
@@ -114,6 +115,7 @@ class ConfigManager:
                 'llm': asdict(self.llm)
             }
             
+            ensure_private_file(self.config_file)
             with open(self.config_file, 'w') as f:
                 json.dump(config_data, f, indent=2)
             
