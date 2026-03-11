@@ -47,3 +47,8 @@
 **Vulnerability:** The `with_guardrails` decorator performed input validation and sanitization but failed to pass the sanitized results to the decorated function, continuing to use the original potentially malicious inputs.
 **Learning:** Validating or sanitizing data without replacing the original reference in the execution flow makes the security check ineffective, leading to "security theater" where the code appears secure but isn't.
 **Prevention:** Always ensure that sanitized outputs from validation routines are explicitly reassigned to the variables being passed to downstream logic. In Python decorators, this requires rebinding the `args` and `kwargs` before the function call.
+
+## 2026-03-11 - [Strict CSP with Nonces in Dashboard]
+**Vulnerability:** The dashboard used `'unsafe-inline'` in its Content Security Policy and had inline `onclick` handlers and `style` attributes, making it vulnerable to XSS if any user-controlled data (like branch names) was improperly escaped.
+**Learning:** Even with Flask's auto-escaping, a defense-in-depth approach using a strict CSP is preferred. However, implementing this required removing all inline event handlers and styles, and using a cryptographically secure nonce for each request.
+**Prevention:** Avoid inline JavaScript and CSS. Use nonced `<script>` and `<style>` blocks and attach event listeners programmatically. Use the `g` object in Flask to generate and propagate a unique nonce per request.
