@@ -200,11 +200,17 @@ class ConflictPredictor:
         if diff_a == diff_b:
             return True
 
+        # BOLT: Length-based early rejection
+        # If the strings have significantly different lengths, the similarity ratio
+        # cannot physically exceed 0.7. Mathematical upper bound: 2*min(L1, L2)/(L1+L2)
+        # This is O(1) and replaces the more expensive seq.real_quick_ratio() check.
+        len_a, len_b = len(diff_a), len(diff_b)
+        if 2.0 * min(len_a, len_b) / (len_a + len_b) < 0.7:
+            return False
+
         seq = difflib.SequenceMatcher(None, diff_a, diff_b)
 
         # Fast early rejection
-        if seq.real_quick_ratio() < 0.7:
-            return False
         if seq.quick_ratio() < 0.7:
             return False
 
