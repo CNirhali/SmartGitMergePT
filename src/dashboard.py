@@ -82,6 +82,9 @@ template = '''
             box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
         }
         .no-results { display: none; text-align: center; padding: 20px; color: #57606a; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; margin-top: 1em; }
+        .scenario-types li { padding: 4px 8px; border-radius: 6px; transition: background-color 0.2s; }
+        .scenario-types li:hover { background-color: #f6f8fa; }
+        .scenario-types li:focus-within { background-color: #f6f8fa; outline: 2px solid #0969da; outline-offset: -2px; }
     </style>
 </head>
 <body>
@@ -118,17 +121,17 @@ template = '''
     </div>
 
     <h2>Scenario Types</h2>
-    <ul style="list-style: none; padding-left: 0;">
+    <ul class="scenario-types" style="list-style: none; padding-left: 0;">
         <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}">
-            {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning">⚠️</span>{% else %}<span role="img" aria-label="Clear">✅</span>{% endif %}
+            {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>File Overlap</strong>: Both branches modify the same file(s).
         </li>
         <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}">
-            {% if scenario_types['line_overlap'] %}<span role="img" aria-label="Warning">⚠️</span>{% else %}<span role="img" aria-label="Clear">✅</span>{% endif %}
+            {% if scenario_types['line_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>Line Overlap</strong>: Both branches change the same or similar lines in a file.
         </li>
         <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}">
-            {% if scenario_types['semantic_conflict'] %}<span role="img" aria-label="Warning">⚠️</span>{% else %}<span role="img" aria-label="Clear">✅</span>{% endif %}
+            {% if scenario_types['semantic_conflict'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>Semantic Conflict</strong>: Changes are different but may cause logical or functional conflicts.
         </li>
     </ul>
