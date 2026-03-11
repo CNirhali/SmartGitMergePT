@@ -1,10 +1,15 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, g
 from git_utils import GitUtils
 from predictor import ConflictPredictor
 import argparse
 from datetime import datetime, timezone
+import secrets
 
 app = Flask(__name__)
+
+@app.before_request
+def generate_nonce():
+    g.nonce = secrets.token_urlsafe(16)
 
 template = '''
 <!DOCTYPE html>
@@ -12,7 +17,7 @@ template = '''
 <head>
     <meta charset="UTF-8">
     <title>SmartGitMergePT Dashboard</title>
-    <style>
+    <style nonce="{{ nonce }}">
         html { scroll-behavior: smooth; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; margin: 2em; line-height: 1.5; color: #24292f; }
         table { border-collapse: collapse; width: 100%; max-width: 900px; margin-top: 1em; }
@@ -82,20 +87,27 @@ template = '''
             box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
         }
         .no-results { display: none; text-align: center; padding: 20px; color: #57606a; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; margin-top: 1em; }
+        .filter-container { display: flex; align-items: center; gap: 8px; }
+        #clear-filter { margin-bottom: 0; padding: 4px 8px; display: none; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+        #monitored-branches-list { margin-bottom: 2em; }
+        .scenario-list { list-style: none; padding-left: 0; }
+        .branch-sep { color: #57606a; margin: 0 4px; }
+        #filter-results-count { font-size: 0.9em; color: #57606a; }
     </style>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <button class="refresh-btn" onclick="refresh()" aria-label="Refresh conflict predictions (Press 'r')">Refresh<kbd>r</kbd></button>
+    <button class="refresh-btn" aria-label="Refresh conflict predictions (Press 'r')">Refresh<kbd>r</kbd></button>
     <div class="timestamp">Last updated: <time datetime="{{ now.isoformat() }}">{{ now.strftime('%Y-%m-%d %H:%M:%S') }} UTC</time></div>
     <h1 id="main-content">SmartGitMergePT Dashboard</h1>
 
-    <div class="filter-container" style="display: flex; align-items: center; gap: 8px;">
+    <div class="filter-container">
         <input type="text" id="filter-input" class="filter-input" placeholder="Filter branches or conflicts... (Press '/' to focus)" aria-label="Filter branches or conflicts">
-        <button id="clear-filter" class="refresh-btn" style="margin-bottom: 0; padding: 4px 8px; display: none;" aria-label="Clear filter (Press 'Esc')">Clear<kbd>Esc</kbd></button>
-        <span id="filter-results-count" style="font-size: 0.9em; color: #57606a;" aria-live="polite"></span>
+        <button id="clear-filter" class="refresh-btn" aria-label="Clear filter (Press 'Esc')">Clear<kbd>Esc</kbd></button>
+        <span id="filter-results-count" aria-live="polite"></span>
     </div>
-    <div id="announcer" class="sr-only" aria-live="polite" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;"></div>
+    <div id="announcer" class="sr-only" aria-live="polite"></div>
 
     <div class="summary">
         <div class="summary-item">
@@ -110,7 +122,7 @@ template = '''
     </div>
 
     <h2>Monitored Branches</h2>
-    <div id="monitored-branches-list" style="margin-bottom: 2em;">
+    <div id="monitored-branches-list">
     {% for branch in branches %}
         {% set has_conflict = branch in conflicting_branches %}
         <span class="branch-tag {{ 'has-conflict' if has_conflict }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (has predicted conflicts)' if has_conflict }}" data-branch="{{ branch }}">{{ branch }}</span>
@@ -118,7 +130,7 @@ template = '''
     </div>
 
     <h2>Scenario Types</h2>
-    <ul style="list-style: none; padding-left: 0;">
+    <ul class="scenario-list">
         <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}">
             {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning">⚠️</span>{% else %}<span role="img" aria-label="Clear">✅</span>{% endif %}
             <strong>File Overlap</strong>: Both branches modify the same file(s).
@@ -149,7 +161,7 @@ template = '''
             <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}">
                 <td>
                     <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}</span>
-                    <span style="color: #57606a; margin: 0 4px;">↔</span>
+                    <span class="branch-sep">↔</span>
                     <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][1] }}" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}</span>
                 </td>
                 <td>
@@ -183,8 +195,11 @@ template = '''
     <div class="empty-state">No likely conflicts detected between branches. Everything looks clear! ✨</div>
     {% endif %}
 
-    <script>
+    <script nonce="{{ nonce }}">
         const refreshBtn = document.querySelector('.refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', refresh);
+        }
         function refresh() {
             refreshBtn.textContent = 'Refreshing...';
             refreshBtn.disabled = true;
@@ -358,6 +373,7 @@ def dashboard():
 
     return render_template_string(
         template,
+        nonce=g.nonce,
         branches=branches,
         predictions=predictions,
         conflicting_branches=conflicting_branches,
@@ -369,11 +385,19 @@ def dashboard():
 def add_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    csp = (
+        "default-src 'self'; "
+        f"style-src 'self' 'nonce-{g.get('nonce', '')}'; "
+        f"script-src 'self' 'nonce-{g.get('nonce', '')}'"
+    )
+    response.headers['Content-Security-Policy'] = csp
     return response
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SmartGitMergePT Dashboard')
     parser.add_argument('--port', type=int, default=5000, help='Port to run the dashboard on')
     args = parser.parse_args()
-    app.run(debug=False, port=args.port)
+    # Explicitly binding to 127.0.0.1 for security
+    app.run(debug=False, port=args.port, host='127.0.0.1')
