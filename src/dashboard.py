@@ -94,7 +94,7 @@ template = '''
         .scenario-list { list-style: none; padding-left: 0; }
         .branch-sep { color: #57606a; margin: 0 4px; }
         #filter-results-count { font-size: 0.9em; color: #57606a; }
-        .scenario-types li { padding: 4px 8px; border-radius: 6px; transition: background-color 0.2s; }
+        .scenario-types li { padding: 4px 8px; border-radius: 6px; transition: background-color 0.2s; cursor: pointer; }
         .scenario-types li:hover { background-color: #f6f8fa; }
         .scenario-types li:focus-within { background-color: #f6f8fa; outline: 2px solid #0969da; outline-offset: -2px; }
     </style>
@@ -133,19 +133,18 @@ template = '''
     </div>
 
     <h2>Scenario Types</h2>
-    <ul class="scenario-list">
     <ul class="scenario-types" style="list-style: none; padding-left: 0;">
-        <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}">
+        <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="File Overlap" aria-label="Filter by File Overlap: {{ scenario_types['file_overlap'] }} found">
             {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
-            <strong>File Overlap</strong>: Both branches modify the same file(s).
+            <strong>File Overlap</strong> ({{ scenario_types['file_overlap'] }}): Both branches modify the same file(s).
         </li>
-        <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}">
+        <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="Line Overlap" aria-label="Filter by Line Overlap: {{ scenario_types['line_overlap'] }} found">
             {% if scenario_types['line_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
-            <strong>Line Overlap</strong>: Both branches change the same or similar lines in a file.
+            <strong>Line Overlap</strong> ({{ scenario_types['line_overlap'] }}): Both branches change the same or similar lines in a file.
         </li>
-        <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}">
+        <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}" role="button" tabindex="0" data-filter="Semantic Conflict" aria-label="Filter by Semantic Conflict: {{ scenario_types['semantic_conflict'] }} found">
             {% if scenario_types['semantic_conflict'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
-            <strong>Semantic Conflict</strong>: Changes are different but may cause logical or functional conflicts.
+            <strong>Semantic Conflict</strong> ({{ scenario_types['semantic_conflict'] }}): Changes are different but may cause logical or functional conflicts.
         </li>
     </ul>
 
@@ -170,6 +169,7 @@ template = '''
                 </td>
                 <td>
                     {% if pred['files'] %}
+                        <span class="sr-only">File Overlap</span>
                         {% for file in pred['files'] %}
                             <code class="file-tag" role="button" tabindex="0" aria-label="Click to copy file path: {{ file }}" data-copy="{{ file }}">{{ file }}</code>{% if not loop.last %}, {% endif %}
                         {% endfor %}
@@ -179,14 +179,14 @@ template = '''
                 </td>
                 <td>
                     {% if pred['line_conflicts'] %}
-                        <span class="badge badge-error" aria-label="Line overlap detected">⚠️ Yes</span>
+                        <span class="badge badge-error" aria-label="Line overlap detected"><span class="sr-only">Line Overlap</span>⚠️ Yes</span>
                     {% else %}
                         <span class="absent" aria-label="No line overlap detected">—</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if pred['semantic_conflict'] %}
-                        <span class="badge badge-error" aria-label="Semantic conflict detected">⚠️ Yes</span>
+                        <span class="badge badge-error" aria-label="Semantic conflict detected"><span class="sr-only">Semantic Conflict</span>⚠️ Yes</span>
                     {% else %}
                         <span class="absent" aria-label="No semantic conflict detected">—</span>
                     {% endif %}
@@ -248,6 +248,27 @@ template = '''
                 if (row) row.classList.toggle('highlight', active);
             });
         }
+
+        document.querySelectorAll('.scenario-types li').forEach(item => {
+            const applyFilter = () => {
+                const filterValue = item.getAttribute('data-filter');
+                filterInput.value = filterValue;
+                filterInput.dispatchEvent(new Event('input'));
+                filterInput.focus();
+                // Smooth scroll to table if not in view
+                const table = document.querySelector('table');
+                if (table && window.getComputedStyle(table).display !== 'none') {
+                    table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            };
+            item.addEventListener('click', applyFilter);
+            item.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    applyFilter();
+                }
+            });
+        });
 
         document.querySelectorAll('.branch-tag, .file-tag').forEach(tag => {
             const isFile = tag.classList.contains('file-tag');
@@ -366,9 +387,9 @@ def dashboard():
     predictions = predictor.predict_conflicts(branches)
     # Determine which scenario types are present
     scenario_types = {
-        'file_overlap': any(pred['files'] for pred in predictions),
-        'line_overlap': any(pred['line_conflicts'] for pred in predictions),
-        'semantic_conflict': any(pred['semantic_conflict'] for pred in predictions)
+        'file_overlap': sum(1 for pred in predictions if pred.get('files')),
+        'line_overlap': sum(1 for pred in predictions if pred.get('line_conflicts')),
+        'semantic_conflict': sum(1 for pred in predictions if pred.get('semantic_conflict'))
     }
     # PALETTE: Identify branches with conflicts for at-a-glance status
     conflicting_branches = set()
