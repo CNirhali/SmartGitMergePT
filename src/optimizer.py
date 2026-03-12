@@ -100,9 +100,7 @@ class SmartCache:
         self.misses = 0
         self.evictions = 0
         
-        # Load persistent cache if enabled
-        if config.enable_persistence:
-            self._load_persistent_cache()
+        # BOLT: Removed eager _load_persistent_cache() to speed up initialization
     
     def _get_cache_key(self, key: str) -> str:
         """BOLT: Consistently use MD5 hash for internal keying to support preloading and memory efficiency"""
@@ -123,7 +121,8 @@ class SmartCache:
             
             # Try persistent cache if enabled
             if self.config.enable_persistence:
-                value = self._load_from_disk(key)
+                # BOLT: Passing pre-calculated cache_key
+                value = self._load_from_disk(cache_key)
                 if value is not None:
                     self.hits += 1
                     # BOLT: Store using internal key to avoid redundant memory usage
@@ -152,7 +151,8 @@ class SmartCache:
             
             # Store in persistent cache if enabled
             if self.config.enable_persistence:
-                self._save_to_disk(key, value)
+                # BOLT: Passing pre-calculated cache_key
+                self._save_to_disk(cache_key, value)
             
             return True
         except Exception as e:
@@ -169,7 +169,8 @@ class SmartCache:
                 del self.cache[cache_key]
             
             if self.config.enable_persistence:
-                self._delete_from_disk(key)
+                # BOLT: Passing pre-calculated cache_key
+                self._delete_from_disk(cache_key)
             
             return True
         except Exception as e:
@@ -216,10 +217,10 @@ class SmartCache:
                 return value
         return value
     
-    def _load_from_disk(self, key: str) -> Optional[Any]:
-        """Load value from disk cache"""
+    def _load_from_disk(self, cache_key: str) -> Optional[Any]:
+        """BOLT: Load value from disk cache using pre-calculated key"""
         try:
-            cache_file = self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.cache"
+            cache_file = self.cache_dir / f"{cache_key}.cache"
             if cache_file.exists():
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     return json.load(f, object_hook=smart_json_decoder)
@@ -227,20 +228,20 @@ class SmartCache:
             logger.error(f"Load from disk error: {e}")
         return None
     
-    def _save_to_disk(self, key: str, value: Any):
-        """Save value to disk cache with restrictive permissions"""
+    def _save_to_disk(self, cache_key: str, value: Any):
+        """BOLT: Save value to disk cache using pre-calculated key and restrictive permissions"""
         try:
-            cache_file = self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.cache"
+            cache_file = self.cache_dir / f"{cache_key}.cache"
             ensure_private_file(cache_file)
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(value, f, cls=SmartJSONEncoder)
         except Exception as e:
             logger.error(f"Save to disk error: {e}")
     
-    def _delete_from_disk(self, key: str):
-        """Delete value from disk cache"""
+    def _delete_from_disk(self, cache_key: str):
+        """BOLT: Delete value from disk cache using pre-calculated key"""
         try:
-            cache_file = self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.cache"
+            cache_file = self.cache_dir / f"{cache_key}.cache"
             if cache_file.exists():
                 cache_file.unlink()
         except Exception as e:
