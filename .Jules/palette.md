@@ -17,3 +17,7 @@
 ## 2026-03-10 - [Visual Conflict Cues & Accessible Status]
 **Learning:** In branch-heavy monitoring dashboards, providing a "secondary" visual cue like a status dot (`•`) next to branch tags in the primary list helps users identify points of interest without scanning the entire data table. Always complement these visual cues with updated ARIA labels (e.g., " (has conflicts)") to ensure accessibility parity.
 **Action:** Implement subtle pseudo-element indicators for status-driven tags and always append parenthetical status text to the `aria-label` of those same tags.
+
+## 2026-03-12 - [Category Filtering via Hidden Text]
+**Learning:** For dashboards with a global text-based filter, categories or "scenario types" can be made interactive by injecting hidden descriptive text (using an `.sr-only` utility class) into the relevant data rows. This allows a simple text search mechanism to function as a powerful categorical filter without complex conditional logic in the search implementation.
+**Action:** Use hidden labels like `<span class="sr-only">Category Name</span>` inside table cells to enable instant categorical filtering when the search input is populated with that name.
