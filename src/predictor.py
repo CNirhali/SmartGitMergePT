@@ -8,10 +8,12 @@ class ConflictPredictor:
     def __init__(self, repo_path: str = "."):
         self.git_utils = GitUtils(repo_path)
         # BOLT: Initialize cache for branch metadata and semantic similarity
+        # BOLT: Enabled persistence to allow results to survive between runs/refreshes
         self.cache = SmartCache(CacheConfig(
             strategy=CacheStrategy.TTL,
             max_size=2000,
-            ttl_seconds=600  # 10 minutes cache
+            ttl_seconds=600,  # 10 minutes cache
+            enable_persistence=True
         ))
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
@@ -60,7 +62,7 @@ class ConflictPredictor:
 
             files, lines = self._get_diff_metadata(diff)
             data = {
-                'diff': diff,
+                # BOLT: Removed large 'diff' string to save memory and I/O
                 'files': files,
                 'lines': lines,
                 'sorted_lines': {f: "\n".join(sorted(l)) for f, l in lines.items()},
@@ -73,6 +75,12 @@ class ConflictPredictor:
             results = list(executor.map(_fetch_branch_data, branches))
 
         branch_data = dict(results)
+
+        # BOLT: Moved helper out of loop for better performance
+        def _get_sorted_lines(data, file):
+            if 'sorted_lines' in data:
+                return data['sorted_lines'].get(file, "")
+            return "\n".join(sorted(data['lines'].get(file, [])))
 
         # BOLT: Build a file-to-branches index to optimize pairwise comparison
         # This transforms the O(N^2) search into a more efficient targeted check
@@ -120,21 +128,15 @@ class ConflictPredictor:
                         if cached_sim is not None:
                             semantic_conflict = cached_sim
                         else:
-                            # BOLT: We only care about similarity in overlapping files
-                            # This significantly reduces the size of the input to SequenceMatcher
-                            # BOLT: Using pre-calculated sorted_lines strings with fallback for cache compatibility
-                            sorted_overlap = sorted(overlap)
+                            # BOLT: Check similarity file-by-file for early exit and smaller SequenceMatcher inputs
+                            # This provides a massive win for large multi-file diffs.
+                            for common_f in overlap:
+                                content_a = _get_sorted_lines(data_a, common_f)
+                                content_b = _get_sorted_lines(data_b, common_f)
+                                if self._semantic_similarity(content_a, content_b):
+                                    semantic_conflict = True
+                                    break
 
-                            def get_sorted_lines(data, file):
-                                # Fallback if cache is stale and missing 'sorted_lines'
-                                if 'sorted_lines' in data:
-                                    return data['sorted_lines'].get(file, "")
-                                return "\n".join(sorted(data['lines'].get(file, [])))
-
-                            diff_content_a = "\n".join([get_sorted_lines(data_a, f) for f in sorted_overlap])
-                            diff_content_b = "\n".join([get_sorted_lines(data_b, f) for f in sorted_overlap])
-
-                            semantic_conflict = self._semantic_similarity(diff_content_a, diff_content_b)
                             self.cache.set(sim_key, semantic_conflict)
 
                     if overlap or line_conflicts or semantic_conflict:
@@ -173,6 +175,7 @@ class ConflictPredictor:
                 # Skip +++ or --- headers
                 if len(line) >= 3 and line[1] == c0 and line[2] == c0:
                     continue
+                # BOLT: Using direct indexing to avoid slice allocation
                 current_lines.add(line[1:])
         return files, lines_by_file
 

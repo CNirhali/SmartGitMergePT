@@ -7,6 +7,11 @@ import secrets
 
 app = Flask(__name__)
 
+# BOLT: Singleton predictor and git_utils to keep in-memory cache alive across refreshes
+repo_path = "demo/conflict_scenarios/demo-repo"
+git_utils = GitUtils(repo_path)
+predictor = ConflictPredictor(repo_path)
+
 @app.before_request
 def generate_nonce():
     g.nonce = secrets.token_urlsafe(16)
@@ -380,22 +385,31 @@ template = '''
 
 @app.route('/')
 def dashboard():
-    repo_path = "demo/conflict_scenarios/demo-repo"
-    git_utils = GitUtils(repo_path)
-    predictor = ConflictPredictor(repo_path)
     branches = git_utils.list_branches()
     predictions = predictor.predict_conflicts(branches)
-    # Determine which scenario types are present
-    scenario_types = {
-        'file_overlap': sum(1 for pred in predictions if pred.get('files')),
-        'line_overlap': sum(1 for pred in predictions if pred.get('line_conflicts')),
-        'semantic_conflict': sum(1 for pred in predictions if pred.get('semantic_conflict'))
-    }
-    # PALETTE: Identify branches with conflicts for at-a-glance status
+
+    # BOLT: Calculate scenario types in a single pass over predictions
+    file_overlap_count = 0
+    line_overlap_count = 0
+    semantic_conflict_count = 0
+
     conflicting_branches = set()
     for pred in predictions:
+        if pred.get('files'):
+            file_overlap_count += 1
+        if pred.get('line_conflicts'):
+            line_overlap_count += 1
+        if pred.get('semantic_conflict'):
+            semantic_conflict_count += 1
+
+        # PALETTE: Identify branches with conflicts for at-a-glance status
         conflicting_branches.update(pred['branches'])
 
+    scenario_types = {
+        'file_overlap': file_overlap_count,
+        'line_overlap': line_overlap_count,
+        'semantic_conflict': semantic_conflict_count
+    }
     return render_template_string(
         template,
         nonce=g.nonce,
