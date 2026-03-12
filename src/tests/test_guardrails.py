@@ -335,7 +335,35 @@ class TestGuardrailsManager:
         is_valid, result = self.manager.validate_input(test_list)
         assert is_valid
         assert result == test_list
-    
+
+    def test_validate_input_tuple(self):
+        """Test tuple input validation"""
+        test_tuple = ("item1", "item2")
+        is_valid, result = self.manager.validate_input(test_tuple)
+        assert is_valid
+        assert result == test_tuple
+
+    def test_validate_input_set(self):
+        """Test set input validation"""
+        test_set = {"item1", "item2"}
+        is_valid, result = self.manager.validate_input(test_set)
+        assert is_valid
+        assert result == test_set
+
+    def test_validate_input_nested_collections(self):
+        """Test nested collections validation"""
+        nested = {"a": (1, [2, {3, 4}]), "b": [5, 6]}
+        is_valid, result = self.manager.validate_input(nested)
+        assert is_valid
+        assert result == nested
+
+    def test_validate_input_malicious_nested(self):
+        """Test malicious content in nested collections"""
+        malicious = ["safe", {"key": ("also safe", "../../../etc/passwd")}]
+        is_valid, result = self.manager.validate_input(malicious)
+        assert not is_valid
+        assert "Path traversal" in result
+
     def test_check_rate_limit(self):
         """Test rate limiting"""
         assert self.manager.check_rate_limit("test_key")

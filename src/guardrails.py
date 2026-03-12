@@ -527,6 +527,10 @@ class GuardrailsManager:
             return self._validate_dict(data)
         elif isinstance(data, list):
             return self._validate_list(data)
+        elif isinstance(data, tuple):
+            return self._validate_tuple(data)
+        elif isinstance(data, set):
+            return self._validate_set(data)
         else:
             return True, data
     
@@ -559,6 +563,30 @@ class GuardrailsManager:
                 return False, f"Invalid item at index {i}: {clean_item}"
             validated_data.append(clean_item)
         
+        return True, validated_data
+
+    def _validate_tuple(self, data: Tuple[Any, ...]) -> Tuple[bool, Tuple[Any, ...]]:
+        """Validate tuple input"""
+        validated_data = []
+
+        for i, item in enumerate(data):
+            is_valid, clean_item = self.validate_input(item)
+            if not is_valid:
+                return False, f"Invalid item in tuple at index {i}: {clean_item}"
+            validated_data.append(clean_item)
+
+        return True, tuple(validated_data)
+
+    def _validate_set(self, data: Set[Any]) -> Tuple[bool, Set[Any]]:
+        """Validate set input"""
+        validated_data = set()
+
+        for item in data:
+            is_valid, clean_item = self.validate_input(item)
+            if not is_valid:
+                return False, f"Invalid item in set: {clean_item}"
+            validated_data.add(clean_item)
+
         return True, validated_data
     
     def check_rate_limit(self, key: str, limiter_type: str = "api") -> bool:
