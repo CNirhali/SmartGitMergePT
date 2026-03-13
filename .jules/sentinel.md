@@ -52,3 +52,8 @@
 **Vulnerability:** The dashboard used `'unsafe-inline'` in its Content Security Policy and had inline `onclick` handlers and `style` attributes, making it vulnerable to XSS if any user-controlled data (like branch names) was improperly escaped.
 **Learning:** Even with Flask's auto-escaping, a defense-in-depth approach using a strict CSP is preferred. However, implementing this required removing all inline event handlers and styles, and using a cryptographically secure nonce for each request.
 **Prevention:** Avoid inline JavaScript and CSS. Use nonced `<script>` and `<style>` blocks and attach event listeners programmatically. Use the `g` object in Flask to generate and propagate a unique nonce per request.
+
+## 2026-03-15 - [Memory Exhaustion DoS in RateLimiter]
+**Vulnerability:** The `RateLimiter` used an unbounded `defaultdict` to track request history for unique keys. An attacker could crash the service by providing a large number of unique keys (e.g., spoofed IPs), leading to memory exhaustion.
+**Learning:** Security components that track state based on external keys must always bound that state to prevent resource exhaustion attacks.
+**Prevention:** Use a bounded data structure with an eviction policy (like an LRU cache) for any state tracking indexed by untrusted input.
