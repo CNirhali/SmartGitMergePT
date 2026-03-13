@@ -27,13 +27,14 @@ template = '''
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; margin: 2em; line-height: 1.5; color: #24292f; }
         table { border-collapse: collapse; width: 100%; max-width: 900px; margin-top: 1em; }
         th, td { border: 1px solid #d0d7de; padding: 12px; text-align: left; }
-        th { background: #f6f8fa; font-weight: 600; }
+        th { background: #f6f8fa; font-weight: 600; position: sticky; top: 0; z-index: 10; box-shadow: inset 0 -1px 0 #d0d7de; }
         tr:hover { background-color: #f6f8fa; }
         .present { color: #cf222e; font-weight: bold; }
         .absent { color: #1a7f37; }
-        .refresh-btn { margin-bottom: 1em; padding: 6px 12px; cursor: pointer; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; font-weight: 600; transition: background-color 0.2s; }
+        .refresh-btn { margin-bottom: 1em; padding: 6px 12px; cursor: pointer; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; font-weight: 600; transition: background-color 0.2s; user-select: none; }
         .refresh-btn:hover { background: #f3f4f6; }
         .refresh-btn:active { background: #ebecf0; }
+        .refresh-btn:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
         tr { transition: background-color 0.1s; }
         code { background: #afb8c133; padding: 0.2em 0.4em; border-radius: 6px; font-size: 85%; }
         .timestamp { color: #57606a; font-size: 0.9em; margin-bottom: 1em; }
@@ -41,15 +42,15 @@ template = '''
         .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }
         .badge-success { background: #dafbe1; color: #1a7f37; }
         .badge-error { background: #ffebe9; color: #cf222e; }
-        .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; position: relative; }
+        .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
         .branch-tag:hover { background: #cfeeff; border-color: #0969da; }
-        .branch-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
+        .branch-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
         .branch-tag:active { background: #cfeeff; transform: translateY(1px); }
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
         .branch-tag.has-conflict::after { content: '•'; color: #cf222e; margin-left: 4px; font-weight: bold; }
-        .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; }
+        .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
         .file-tag:hover { background: #afb8c166; }
-        .file-tag:focus { outline: 2px solid #0969da; outline-offset: 2px; }
+        .file-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
         .file-tag:active { background: #afb8c188; transform: translateY(1px); }
         .file-tag.highlight { background: #0969da; color: white; }
         tr.highlight { background-color: #ddf4ff; border-left: 2px solid #0969da; }
@@ -95,7 +96,7 @@ template = '''
         .filter-container { display: flex; align-items: center; gap: 8px; }
         #clear-filter { margin-bottom: 0; padding: 4px 8px; display: none; }
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
-        #monitored-branches-list { margin-bottom: 2em; }
+        #monitored-branches-list { margin-bottom: 2em; list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
         .scenario-list { list-style: none; padding-left: 0; }
         .branch-sep { color: #57606a; margin: 0 4px; }
         #filter-results-count { font-size: 0.9em; color: #57606a; }
@@ -130,12 +131,12 @@ template = '''
     </div>
 
     <h2>Monitored Branches</h2>
-    <div id="monitored-branches-list">
+    <ul id="monitored-branches-list">
     {% for branch in branches %}
         {% set has_conflict = branch in conflicting_branches %}
-        <span class="branch-tag {{ 'has-conflict' if has_conflict }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (has predicted conflicts)' if has_conflict }}" data-branch="{{ branch }}">{{ branch }}</span>
+        <li><span class="branch-tag {{ 'has-conflict' if has_conflict }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (has predicted conflicts)' if has_conflict }}" data-branch="{{ branch }}">{{ branch }}</span></li>
     {% endfor %}
-    </div>
+    </ul>
 
     <h2>Scenario Types</h2>
     <ul class="scenario-types" style="list-style: none; padding-left: 0;">
@@ -169,7 +170,7 @@ template = '''
             <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}">
                 <td>
                     <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}</span>
-                    <span class="branch-sep">↔</span>
+                    <span class="branch-sep" aria-hidden="true">↔</span>
                     <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][1] }}" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}</span>
                 </td>
                 <td>
@@ -314,6 +315,14 @@ template = '''
             table.parentNode.insertBefore(noResults, table.nextSibling);
         }
 
+        function updatePageTitle(count) {
+            const baseTitle = "SmartGitMergePT Dashboard";
+            document.title = (count > 0 ? `(${count}) ` : "") + baseTitle;
+        }
+
+        // Initial title update
+        updatePageTitle(tableRows.length);
+
         filterInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
             let visibleRowsCount = 0;
@@ -341,6 +350,7 @@ template = '''
                 table.style.display = visibleRowsCount > 0 ? '' : 'none';
                 noResults.style.display = (visibleRowsCount === 0 && query !== '') ? 'block' : 'none';
             }
+            updatePageTitle(visibleRowsCount);
         });
 
         clearFilterBtn.addEventListener('click', () => {
