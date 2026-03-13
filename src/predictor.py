@@ -65,7 +65,7 @@ class ConflictPredictor:
                 # BOLT: Removed large 'diff' string to save memory and I/O
                 'files': files,
                 'lines': lines,
-                'sorted_lines': {f: "\n".join(sorted(l)) for f, l in lines.items()},
+                # BOLT: Removed eager 'sorted_lines' calculation to improve O(N) phase
                 'commit': commit_hash
             }
             self.cache.set(cache_key, data)
@@ -76,11 +76,15 @@ class ConflictPredictor:
 
         branch_data = dict(results)
 
-        # BOLT: Moved helper out of loop for better performance
+        # BOLT: Updated helper to lazily calculate and memoize sorted lines in branch_data
         def _get_sorted_lines(data, file):
-            if 'sorted_lines' in data:
-                return data['sorted_lines'].get(file, "")
-            return "\n".join(sorted(data['lines'].get(file, [])))
+            if 'sorted_lines' not in data:
+                data['sorted_lines'] = {}
+
+            if file not in data['sorted_lines']:
+                data['sorted_lines'][file] = "\n".join(sorted(data['lines'].get(file, [])))
+
+            return data['sorted_lines'][file]
 
         # BOLT: Build a file-to-branches index to optimize pairwise comparison
         # This transforms the O(N^2) search into a more efficient targeted check
@@ -160,7 +164,14 @@ class ConflictPredictor:
                 continue
 
             c0 = line[0]
-            if c0 == 'd':  # diff --git ...
+            if c0 == '+' or c0 == '-':
+                if current_lines is not None:
+                    # Skip +++ or --- headers
+                    if len(line) >= 3 and line[1] == c0 and line[2] == c0:
+                        continue
+                    # BOLT: Using direct indexing to avoid slice allocation
+                    current_lines.add(line[1:])
+            elif c0 == 'd':  # diff --git ...
                 if line.startswith('diff --git'):
                     # Extract file path after ' b/' to avoid multiple splits
                     b_idx = line.find(' b/')
@@ -171,12 +182,6 @@ class ConflictPredictor:
                         lines_by_file[current_file] = current_lines
                     else:
                         current_lines = None
-            elif (c0 == '+' or c0 == '-') and current_lines is not None:
-                # Skip +++ or --- headers
-                if len(line) >= 3 and line[1] == c0 and line[2] == c0:
-                    continue
-                # BOLT: Using direct indexing to avoid slice allocation
-                current_lines.add(line[1:])
         return files, lines_by_file
 
     def _extract_changed_files(self, diff: str) -> List[str]:
