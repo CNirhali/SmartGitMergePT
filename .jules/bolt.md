@@ -33,3 +33,7 @@
 ## 2025-05-30 - [Context-Aware Semantic Similarity]
 **Learning:** Running `difflib.SequenceMatcher` on entire diff strings is wasteful and slow, especially when only a small portion of the diff (the overlapping files) is relevant to the conflict prediction. Trimming the input to only overlapping file content significantly improves execution speed and heuristic focus.
 **Action:** Always filter and minimize input size for expensive string comparison algorithms like `SequenceMatcher` to focus on the specific segments that matter.
+
+## 2025-06-05 - [Lazy Evaluation of Comparison Metadata]
+**Learning:** Eagerly calculating comparison metadata (like sorted line sets for similarity checks) during the initial O(N) data gathering phase is wasteful. For repositories where most files don't overlap between branches, thousands of expensive operations are performed for data that is never used.
+**Action:** Always use lazy evaluation and memoization for expensive transformation of per-item metadata that is only needed during targeted pairwise comparisons.
