@@ -537,22 +537,42 @@ class GuardrailsManager:
         self.error_handler.register_recovery_strategy("TimeoutError", self._recover_timeout)
         self.error_handler.register_recovery_strategy("PermissionError", self._recover_permission)
     
-    def validate_input(self, data: Any, input_type: str = "general") -> Tuple[bool, Any]:
-        """Validate input data"""
-        if isinstance(data, str):
-            return self.input_validator.validate_string(data)
-        elif isinstance(data, dict):
-            return self._validate_dict(data)
-        elif isinstance(data, list):
-            return self._validate_list(data)
-        elif isinstance(data, tuple):
-            return self._validate_tuple(data)
-        elif isinstance(data, set):
-            return self._validate_set(data)
-        else:
-            return True, data
+    def validate_input(self, data: Any, input_type: str = "general",
+                      _visited: Optional[Set[int]] = None, _depth: int = 0) -> Tuple[bool, Any]:
+        """Validate input data with recursion and depth protection"""
+        if _depth > 20:
+            return False, "Input nesting too deep (max 20)"
+
+        # Check for circular references in collection types
+        is_collection = isinstance(data, (dict, list, tuple, set))
+        if is_collection:
+            if _visited is None:
+                _visited = set()
+
+            if id(data) in _visited:
+                return False, "Circular reference detected in input"
+
+            _visited.add(id(data))
+
+        try:
+            if isinstance(data, str):
+                return self.input_validator.validate_string(data)
+            elif isinstance(data, dict):
+                return self._validate_dict(data, _visited, _depth + 1)
+            elif isinstance(data, list):
+                return self._validate_list(data, _visited, _depth + 1)
+            elif isinstance(data, tuple):
+                return self._validate_tuple(data, _visited, _depth + 1)
+            elif isinstance(data, set):
+                return self._validate_set(data, _visited, _depth + 1)
+            else:
+                return True, data
+        finally:
+            # Remove from visited set after processing to allow Directed Acyclic Graphs (DAGs)
+            if is_collection and _visited is not None:
+                _visited.remove(id(data))
     
-    def _validate_dict(self, data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+    def _validate_dict(self, data: Dict[str, Any], visited: Set[int], depth: int) -> Tuple[bool, Dict[str, Any]]:
         """Validate dictionary input"""
         validated_data = {}
         
@@ -563,7 +583,7 @@ class GuardrailsManager:
                 return False, f"Invalid key: {key}"
             
             # Validate value
-            is_valid_value, clean_value = self.validate_input(value)
+            is_valid_value, clean_value = self.validate_input(value, _visited=visited, _depth=depth)
             if not is_valid_value:
                 return False, f"Invalid value for key {key}: {clean_value}"
             
@@ -571,36 +591,36 @@ class GuardrailsManager:
         
         return True, validated_data
     
-    def _validate_list(self, data: List[Any]) -> Tuple[bool, List[Any]]:
+    def _validate_list(self, data: List[Any], visited: Set[int], depth: int) -> Tuple[bool, List[Any]]:
         """Validate list input"""
         validated_data = []
         
         for i, item in enumerate(data):
-            is_valid, clean_item = self.validate_input(item)
+            is_valid, clean_item = self.validate_input(item, _visited=visited, _depth=depth)
             if not is_valid:
                 return False, f"Invalid item at index {i}: {clean_item}"
             validated_data.append(clean_item)
         
         return True, validated_data
 
-    def _validate_tuple(self, data: Tuple[Any, ...]) -> Tuple[bool, Tuple[Any, ...]]:
+    def _validate_tuple(self, data: Tuple[Any, ...], visited: Set[int], depth: int) -> Tuple[bool, Tuple[Any, ...]]:
         """Validate tuple input"""
         validated_data = []
 
         for i, item in enumerate(data):
-            is_valid, clean_item = self.validate_input(item)
+            is_valid, clean_item = self.validate_input(item, _visited=visited, _depth=depth)
             if not is_valid:
                 return False, f"Invalid item in tuple at index {i}: {clean_item}"
             validated_data.append(clean_item)
 
         return True, tuple(validated_data)
 
-    def _validate_set(self, data: Set[Any]) -> Tuple[bool, Set[Any]]:
+    def _validate_set(self, data: Set[Any], visited: Set[int], depth: int) -> Tuple[bool, Set[Any]]:
         """Validate set input"""
         validated_data = set()
 
         for item in data:
-            is_valid, clean_item = self.validate_input(item)
+            is_valid, clean_item = self.validate_input(item, _visited=visited, _depth=depth)
             if not is_valid:
                 return False, f"Invalid item in set: {clean_item}"
             validated_data.add(clean_item)

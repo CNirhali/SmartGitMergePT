@@ -57,3 +57,8 @@
 **Vulnerability:** The `RateLimiter` used an unbounded `defaultdict` to track request history for unique keys. An attacker could crash the service by providing a large number of unique keys (e.g., spoofed IPs), leading to memory exhaustion.
 **Learning:** Security components that track state based on external keys must always bound that state to prevent resource exhaustion attacks.
 **Prevention:** Use a bounded data structure with an eviction policy (like an LRU cache) for any state tracking indexed by untrusted input.
+
+## 2026-03-20 - [RecursionError DoS in Input Validation]
+**Vulnerability:** `GuardrailsManager.validate_input` was vulnerable to Denial of Service via `RecursionError` when processing circular or deeply nested data structures.
+**Learning:** Recursive validation of arbitrary data containers must be bounded by depth and track visited objects to prevent stack exhaustion.
+**Prevention:** Implement a maximum depth check and use a `visited` set (tracking object IDs) that is managed with `try...finally` to allow Directed Acyclic Graphs (DAGs) while blocking cycles.
