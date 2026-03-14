@@ -17,7 +17,7 @@ import secrets
 import time
 import traceback
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import defaultdict, deque, OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -72,24 +72,38 @@ class PerformanceMetrics:
     error_rate: float
 
 class RateLimiter:
-    """Rate limiting implementation with sliding window"""
+    """Rate limiting implementation with sliding window and memory protection"""
     
-    def __init__(self, max_requests: int, window_seconds: int):
+    def __init__(self, max_requests: int, window_seconds: int, max_tracked_keys: int = 1000):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self.requests = defaultdict(deque)
+        self.max_tracked_keys = max_tracked_keys
+        self.requests = OrderedDict()
     
     def is_allowed(self, key: str) -> bool:
         now = time.monotonic()
         window_start = now - self.window_seconds
         
-        # Clean old requests
-        while self.requests[key] and self.requests[key][0] < window_start:
-            self.requests[key].popleft()
+        # Get or create deque for this key
+        if key in self.requests:
+            # Move to end to maintain LRU order (most recently used)
+            self.requests.move_to_end(key)
+            request_queue = self.requests[key]
+        else:
+            # Enforce max tracked keys limit to prevent DoS via memory exhaustion
+            if len(self.requests) >= self.max_tracked_keys:
+                self.requests.popitem(last=False)  # Remove least recently used
+
+            request_queue = deque()
+            self.requests[key] = request_queue
+
+        # Clean old requests from the window
+        while request_queue and request_queue[0] < window_start:
+            request_queue.popleft()
         
         # Check if under limit
-        if len(self.requests[key]) < self.max_requests:
-            self.requests[key].append(now)
+        if len(request_queue) < self.max_requests:
+            request_queue.append(now)
             return True
         
         return False
@@ -126,6 +140,10 @@ class InputValidator:
         
         if len(value) > max_length:
             return False, f"String too long (max {max_length} characters)"
+
+        # Check for null bytes to prevent injection/bypass
+        if '\0' in value:
+            return False, "Null byte detected in input"
         
         # Check for sensitive data
         for pattern in self.sensitive_patterns:
