@@ -47,6 +47,7 @@ template = '''
         .branch-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
         .branch-tag:active { background: #cfeeff; transform: translateY(1px); }
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
+        .branch-tag.highlight-secondary { background: #ddf4ff; color: #0969da; border-color: #0969da; }
         .branch-tag.has-conflict::after { content: '•'; color: #cf222e; margin-left: 4px; font-weight: bold; }
         .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
         .file-tag:hover { background: #afb8c166; }
@@ -243,6 +244,11 @@ template = '''
             });
             document.querySelectorAll(`tr[data-branch-a="${branch}"], tr[data-branch-b="${branch}"]`).forEach(row => {
                 row.classList.toggle('highlight', active);
+                // PALETTE: Highlight the "partner" branch in the monitored list
+                const partner = row.getAttribute('data-branch-a') === branch ? row.getAttribute('data-branch-b') : row.getAttribute('data-branch-a');
+                document.querySelectorAll(`#monitored-branches-list .branch-tag[data-branch="${partner}"]`).forEach(tag => {
+                    tag.classList.toggle('highlight-secondary', active);
+                });
             });
         }
 
@@ -251,7 +257,15 @@ template = '''
                 tag.classList.toggle('highlight', active);
                 // PALETTE: Highlight the entire conflict row when a file is hovered
                 const row = tag.closest('tr');
-                if (row) row.classList.toggle('highlight', active);
+                if (row) {
+                    row.classList.toggle('highlight', active);
+                    // PALETTE: Highlight branches involved in this specific conflict row
+                    const bA = row.getAttribute('data-branch-a');
+                    const bB = row.getAttribute('data-branch-b');
+                    document.querySelectorAll(`#monitored-branches-list .branch-tag[data-branch="${bA}"], #monitored-branches-list .branch-tag[data-branch="${bB}"]`).forEach(tag => {
+                        tag.classList.toggle('highlight-secondary', active);
+                    });
+                }
             });
         }
 
@@ -323,8 +337,30 @@ template = '''
         // Initial title update
         updatePageTitle(tableRows.length);
 
+        // PALETTE: Restore filter from localStorage
+        try {
+            const savedFilter = localStorage.getItem('smartgit_dashboard_filter');
+            if (savedFilter) {
+                filterInput.value = savedFilter;
+                // Delay execution slightly to ensure all elements are ready if needed,
+                // though here we can call it immediately since DOM is loaded.
+                setTimeout(() => {
+                    filterInput.dispatchEvent(new Event('input'));
+                }, 0);
+            }
+        } catch (e) {
+            console.warn('Could not restore filter from localStorage:', e);
+        }
+
         filterInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
+            // PALETTE: Save filter to localStorage
+            try {
+                localStorage.setItem('smartgit_dashboard_filter', query);
+            } catch (e) {
+                console.warn('Could not save filter to localStorage:', e);
+            }
+
             let visibleRowsCount = 0;
             clearFilterBtn.style.display = query ? 'inline-block' : 'none';
 
