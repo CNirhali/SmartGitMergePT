@@ -88,6 +88,57 @@ class TestInputValidator:
         assert not is_valid
         assert "Dangerous" in result
 
+    def test_validate_url_null_byte(self):
+        """Test null byte detection in URL"""
+        malicious_url = "http://example.com\0admin"
+        is_valid, result = self.validator.validate_url(malicious_url)
+        assert not is_valid
+        assert "Null byte" in result
+
+    def test_validate_url_trailing_dot_bypass(self):
+        """Test SSRF bypass via trailing dot (e.g. localhost.)"""
+        malicious_url = "http://localhost./admin"
+        is_valid, result = self.validator.validate_url(malicious_url)
+        assert not is_valid
+        assert "Local URL not allowed" in result
+
+    def test_validate_url_percent_encoding_bypass(self):
+        """Test SSRF bypass via percent-encoded hostname"""
+        # %6c%6f%63%61%6c%68%6f%73%74 is 'localhost'
+        malicious_url = "http://%6c%6f%63%61%6c%68%6f%73%74/admin"
+        is_valid, result = self.validator.validate_url(malicious_url)
+        assert not is_valid
+        assert "Local URL not allowed" in result
+
+    def test_validate_url_shorthand_ip_bypass(self):
+        """Test SSRF bypass via shorthand IP notation"""
+        # 127.1 is a shorthand for 127.0.0.1
+        malicious_url = "http://127.1/admin"
+        is_valid, result = self.validator.validate_url(malicious_url)
+        assert not is_valid
+        assert "Internal IP (shorthand) not allowed" in result
+
+    def test_validate_url_integer_ip_bypass(self):
+        """Test SSRF bypass via integer IP notation"""
+        # 2130706433 is 127.0.0.1 in integer format
+        malicious_url = "http://2130706433/admin"
+        is_valid, result = self.validator.validate_url(malicious_url)
+        assert not is_valid
+        assert "Internal IP (shorthand) not allowed" in result
+
+    def test_validate_url_private_ip(self):
+        """Test private IP detection"""
+        private_urls = [
+            "http://192.168.1.1",
+            "http://10.0.0.1",
+            "http://172.16.0.1",
+            "http://[fd00::1]"
+        ]
+        for url in private_urls:
+            is_valid, result = self.validator.validate_url(url)
+            assert not is_valid
+            assert "Internal IP" in result
+
 class TestRateLimiter:
     """Test rate limiting functionality"""
     

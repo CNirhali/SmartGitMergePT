@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import secrets
+import socket
 import time
 import traceback
 from abc import ABC, abstractmethod
@@ -24,7 +25,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 import weakref
 
 import psutil
@@ -189,6 +190,10 @@ class InputValidator:
     def validate_url(self, url: str) -> Tuple[bool, str]:
         """Validate URL for security (SSRF protection)"""
         try:
+            # Check for null bytes to prevent bypasses
+            if '\0' in url:
+                return False, "Null byte detected in URL"
+
             parsed = urlparse(url)
             
             # Check for dangerous protocols
@@ -200,8 +205,11 @@ class InputValidator:
             if not hostname:
                 return False, "URL must have a hostname"
             
+            # Normalize hostname: unquote and strip trailing dots (e.g. localhost.)
+            normalized_hostname = unquote(hostname).lower().rstrip('.')
+
             # Check for literal loopback/private hostnames
-            if hostname.lower() in {'localhost', 'loopback', 'localhost.localdomain'}:
+            if normalized_hostname in {'localhost', 'loopback', 'localhost.localdomain'}:
                 return False, "Local URL not allowed"
 
             # Handle IP-based hostnames for robust SSRF protection
@@ -209,34 +217,17 @@ class InputValidator:
                 # Remove brackets from IPv6 literal if present
                 ip_str = hostname.strip('[]')
                 ip = ipaddress.ip_address(ip_str)
-
-                # Check for loopback, private, link-local, and reserved ranges
-                if ip.is_loopback:
-                    return False, "Loopback IP not allowed"
-                if ip.is_private:
-                    return False, "Private IP not allowed"
-                if ip.is_link_local:
-                    return False, "Link-local IP not allowed"
-                if ip.is_multicast:
-                    return False, "Multicast IP not allowed"
-                if ip.is_reserved:
-                    return False, "Reserved IP not allowed"
-                if ip.is_unspecified:
-                    return False, "Unspecified IP not allowed"
+                if self._is_internal_ip(ip):
+                    return False, f"Internal IP not allowed: {ip}"
 
             except ValueError:
-                # Hostname is not a valid IP address, check for shorthand IP notation
+                # Hostname is not a valid IP address, check for shorthand IP notation (e.g. 127.1)
                 try:
-                    # socket.inet_aton handles shorthand like 127.1
-                    import socket
                     packed_ip = socket.inet_aton(hostname)
                     ip_str = socket.inet_ntoa(packed_ip)
                     ip = ipaddress.ip_address(ip_str)
-
-                    if ip.is_loopback:
-                        return False, "Loopback IP (shorthand) not allowed"
-                    if ip.is_private:
-                        return False, "Private IP (shorthand) not allowed"
+                    if self._is_internal_ip(ip):
+                        return False, f"Internal IP (shorthand) not allowed: {ip}"
                 except (socket.error, ValueError):
                     # Hostname is truly not an IP or invalid IP
                     pass
@@ -244,6 +235,17 @@ class InputValidator:
             return True, url
         except Exception as e:
             return False, f"URL validation error: {str(e)}"
+
+    def _is_internal_ip(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
+        """Check if an IP address belongs to an internal or reserved range"""
+        return (
+            ip.is_loopback or
+            ip.is_private or
+            ip.is_link_local or
+            ip.is_multicast or
+            ip.is_reserved or
+            ip.is_unspecified
+        )
     
     def _sanitize_html(self, text: str) -> str:
         """Basic HTML sanitization"""
