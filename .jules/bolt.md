@@ -37,3 +37,7 @@
 ## 2025-06-05 - [Lazy Evaluation of Comparison Metadata]
 **Learning:** Eagerly calculating comparison metadata (like sorted line sets for similarity checks) during the initial O(N) data gathering phase is wasteful. For repositories where most files don't overlap between branches, thousands of expensive operations are performed for data that is never used.
 **Action:** Always use lazy evaluation and memoization for expensive transformation of per-item metadata that is only needed during targeted pairwise comparisons.
+
+## 2025-06-10 - [Regex Pattern Combination and Fast-Pathing]
+**Learning:** Calling `re.search` multiple times in a loop (e.g., for security validation) is significantly slower than combining patterns into a single grouped regex. Additionally, for "clean" inputs, expensive regex substitutions in sanitization can be entirely bypassed with $O(N)$ string checks (like `in` or `str.contains`).
+**Action:** Combine multiple independent regex patterns into a single pre-compiled regex for initial "all-clear" checks. Implement $O(N)$ fast-paths to skip expensive processing for common safe inputs.

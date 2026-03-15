@@ -113,26 +113,41 @@ class InputValidator:
     """Comprehensive input validation and sanitization"""
     
     def __init__(self):
-        self.sensitive_patterns = [
+        # BOLT: Pre-compile and combine patterns for performance
+        # Using a single combined regex reduces re.search calls from N to 1
+        sensitive_patterns = [
             r'password\s*[:=]\s*\S+',
             r'api_key\s*[:=]\s*\S+',
             r'token\s*[:=]\s*\S+',
             r'secret\s*[:=]\s*\S+',
             r'private_key\s*[:=]\s*\S+',
         ]
+        self._sensitive_re = re.compile('|'.join(sensitive_patterns), re.IGNORECASE)
         
-        self.path_traversal_patterns = [
+        path_traversal_patterns = [
             r'\.\./',
             r'\.\.\\',
             r'%2e%2e%2f',
             r'%2e%2e%5c',
         ]
+        self._path_traversal_re = re.compile('|'.join(path_traversal_patterns), re.IGNORECASE)
         
-        self.sql_injection_patterns = [
+        sql_injection_patterns = [
             r'(\b(union|select|insert|update|delete|drop|create|alter)\b)',
             r'(\b(or|and)\b\s+\d+\s*[=<>])',
             r'(\b(union|select)\b.*\bfrom\b)',
         ]
+        self._sql_injection_re = re.compile('|'.join(sql_injection_patterns), re.IGNORECASE)
+
+        # BOLT: Combined security regex for faster all-in-one check
+        self._combined_security_re = re.compile('|'.join(
+            sensitive_patterns + path_traversal_patterns + sql_injection_patterns
+        ), re.IGNORECASE)
+
+        # BOLT: Pre-compile HTML patterns
+        self._html_tag_re = re.compile(r'<[^>]+>')
+        self._script_tag_re = re.compile(r'<script[^>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
+        self._js_url_re = re.compile(r'javascript:', re.IGNORECASE)
     
     def validate_string(self, value: str, max_length: int = 1000, allow_html: bool = False) -> Tuple[bool, str]:
         """Validate and sanitize string input"""
@@ -146,19 +161,14 @@ class InputValidator:
         if '\0' in value:
             return False, "Null byte detected in input"
         
-        # Check for sensitive data
-        for pattern in self.sensitive_patterns:
-            if re.search(pattern, value, re.IGNORECASE):
+        # BOLT: Use pre-compiled combined regex for high-performance security check
+        if self._combined_security_re.search(value):
+            # If hit, do individual checks to return specific error messages
+            if self._sensitive_re.search(value):
                 return False, "Sensitive data detected in input"
-        
-        # Check for path traversal
-        for pattern in self.path_traversal_patterns:
-            if re.search(pattern, value, re.IGNORECASE):
+            if self._path_traversal_re.search(value):
                 return False, "Path traversal attempt detected"
-        
-        # Check for SQL injection
-        for pattern in self.sql_injection_patterns:
-            if re.search(pattern, value, re.IGNORECASE):
+            if self._sql_injection_re.search(value):
                 return False, "SQL injection attempt detected"
         
         # Sanitize HTML if not allowed
@@ -249,12 +259,18 @@ class InputValidator:
     
     def _sanitize_html(self, text: str) -> str:
         """Basic HTML sanitization"""
+        # BOLT: O(N) fast-path check to avoid expensive regex substitutions if safe
+        if '<' not in text and 'javascript:' not in text.lower():
+            # If no tags and no JS URLs, we only need html.escape for safety
+            return html.escape(text)
+
+        # BOLT: Use pre-compiled regex for better performance
         # Remove common HTML tag patterns
-        text = re.sub(r'<[^>]+>', '', text)
+        text = self._html_tag_re.sub('', text)
         # Remove script tags
-        text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+        text = self._script_tag_re.sub('', text)
         # Remove javascript: URLs
-        text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
+        text = self._js_url_re.sub('', text)
         # Escape HTML characters last for robustness
         text = html.escape(text)
         return text
