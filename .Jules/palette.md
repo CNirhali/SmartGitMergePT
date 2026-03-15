@@ -21,3 +21,7 @@
 ## 2026-03-12 - [Category Filtering via Hidden Text]
 **Learning:** For dashboards with a global text-based filter, categories or "scenario types" can be made interactive by injecting hidden descriptive text (using an `.sr-only` utility class) into the relevant data rows. This allows a simple text search mechanism to function as a powerful categorical filter without complex conditional logic in the search implementation.
 **Action:** Use hidden labels like `<span class="sr-only">Category Name</span>` inside table cells to enable instant categorical filtering when the search input is populated with that name.
+
+## 2026-03-15 - [Bidirectional Data Highlighting]
+**Learning:** Linking summary metrics to specific data rows via bidirectional highlighting (Scenario Types <-> Table Rows) provides immediate visual validation of the summary data and helps users quickly navigate large datasets. This pattern turns a static summary into an interactive "map" of the data.
+**Action:** Implement `data-scenario` and `data-scenarios` attributes to link category items to data rows, and use JavaScript to toggle highlighting on both when either is hovered or focused.
