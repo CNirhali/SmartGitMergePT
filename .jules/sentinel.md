@@ -62,3 +62,8 @@
 **Vulnerability:** `GuardrailsManager.validate_input` was vulnerable to Denial of Service via `RecursionError` when processing circular or deeply nested data structures.
 **Learning:** Recursive validation of arbitrary data containers must be bounded by depth and track visited objects to prevent stack exhaustion.
 **Prevention:** Implement a maximum depth check and use a `visited` set (tracking object IDs) that is managed with `try...finally` to allow Directed Acyclic Graphs (DAGs) while blocking cycles.
+
+## 2026-03-15 - [SSRF Protection with Hostname Normalization]
+**Vulnerability:** URL validation could be bypassed using percent-encoded hostnames (e.g., %6c%6f%63%61%6c%68%6f%73%74), trailing dots (e.g., localhost.), and shorthand IP notation (e.g., 127.1).
+**Learning:** Simple string matching and even basic `urlparse` are insufficient for SSRF protection as they don't account for various ways hostnames can be represented.
+**Prevention:** Normalize hostnames by unquoting and stripping trailing dots before validation. Use `socket.inet_aton` to resolve shorthand IP notations and validate the resulting IP against loopback and private ranges.
