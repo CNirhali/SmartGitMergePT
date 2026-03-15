@@ -35,8 +35,8 @@ template = '''
         .refresh-btn:hover { background: #f3f4f6; }
         .refresh-btn:active { background: #ebecf0; }
         .refresh-btn:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
-        tr { transition: background-color 0.1s; }
-        code { background: #afb8c133; padding: 0.2em 0.4em; border-radius: 6px; font-size: 85%; }
+        tr { transition: background-color 0.2s, border-color 0.2s; }
+        code { background: #afb8c133; padding: 0.2em 0.4em; border-radius: 6px; font-size: 85%; transition: background-color 0.2s, color 0.2s; }
         .timestamp { color: #57606a; font-size: 0.9em; margin-bottom: 1em; }
         .empty-state { padding: 20px; text-align: center; background: #f6f8fa; border: 1px dashed #d0d7de; border-radius: 6px; color: #57606a; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }
@@ -49,6 +49,8 @@ template = '''
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
         .branch-tag.highlight-secondary { background: #ddf4ff; color: #0969da; border-color: #0969da; }
         .branch-tag.has-conflict::after { content: '•'; color: #cf222e; margin-left: 4px; font-weight: bold; }
+        .branch-tag.base-branch { border-style: dashed; border-color: #57606a; }
+        .branch-tag.base-branch small { color: #57606a; font-weight: normal; margin-left: 2px; }
         .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
         .file-tag:hover { background: #afb8c166; }
         .file-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
@@ -101,9 +103,10 @@ template = '''
         .scenario-list { list-style: none; padding-left: 0; }
         .branch-sep { color: #57606a; margin: 0 4px; }
         #filter-results-count { font-size: 0.9em; color: #57606a; }
-        .scenario-types li { padding: 4px 8px; border-radius: 6px; transition: background-color 0.2s; cursor: pointer; }
+        .scenario-types li { padding: 4px 8px; border-radius: 6px; transition: background-color 0.2s, transform 0.1s; cursor: pointer; border: 1px solid transparent; }
         .scenario-types li:hover { background-color: #f6f8fa; }
         .scenario-types li:focus-within { background-color: #f6f8fa; outline: 2px solid #0969da; outline-offset: -2px; }
+        .scenario-types li.highlight-secondary { background-color: #ddf4ff; border-color: #0969da; }
     </style>
 </head>
 <body>
@@ -135,21 +138,22 @@ template = '''
     <ul id="monitored-branches-list">
     {% for branch in branches %}
         {% set has_conflict = branch in conflicting_branches %}
-        <li><span class="branch-tag {{ 'has-conflict' if has_conflict }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (has predicted conflicts)' if has_conflict }}" data-branch="{{ branch }}">{{ branch }}</span></li>
+        {% set is_base = branch == main_branch %}
+        <li><span class="branch-tag {{ 'has-conflict' if has_conflict }} {{ 'base-branch' if is_base }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (base branch)' if is_base }}{{ ' (has predicted conflicts)' if has_conflict }}" data-branch="{{ branch }}">{{ branch }}{% if is_base %} <small aria-hidden="true">(base)</small>{% endif %}</span></li>
     {% endfor %}
     </ul>
 
     <h2>Scenario Types</h2>
     <ul class="scenario-types" style="list-style: none; padding-left: 0;">
-        <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="File Overlap" aria-label="Filter by File Overlap: {{ scenario_types['file_overlap'] }} found">
+        <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="File Overlap" data-scenario="file_overlap" aria-label="Filter by File Overlap: {{ scenario_types['file_overlap'] }} found">
             {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>File Overlap</strong> ({{ scenario_types['file_overlap'] }}): Both branches modify the same file(s).
         </li>
-        <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="Line Overlap" aria-label="Filter by Line Overlap: {{ scenario_types['line_overlap'] }} found">
+        <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="Line Overlap" data-scenario="line_overlap" aria-label="Filter by Line Overlap: {{ scenario_types['line_overlap'] }} found">
             {% if scenario_types['line_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>Line Overlap</strong> ({{ scenario_types['line_overlap'] }}): Both branches change the same or similar lines in a file.
         </li>
-        <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}" role="button" tabindex="0" data-filter="Semantic Conflict" aria-label="Filter by Semantic Conflict: {{ scenario_types['semantic_conflict'] }} found">
+        <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}" role="button" tabindex="0" data-filter="Semantic Conflict" data-scenario="semantic_conflict" aria-label="Filter by Semantic Conflict: {{ scenario_types['semantic_conflict'] }} found">
             {% if scenario_types['semantic_conflict'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>Semantic Conflict</strong> ({{ scenario_types['semantic_conflict'] }}): Changes are different but may cause logical or functional conflicts.
         </li>
@@ -168,7 +172,7 @@ template = '''
         </thead>
         <tbody>
             {% for pred in predictions %}
-            <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}">
+            <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}" data-scenarios="{{ 'file_overlap' if pred.get('files') }} {{ 'line_overlap' if pred.get('line_conflicts') }} {{ 'semantic_conflict' if pred.get('semantic_conflict') }}">
                 <td>
                     <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}</span>
                     <span class="branch-sep" aria-hidden="true">↔</span>
@@ -265,6 +269,33 @@ template = '''
                     document.querySelectorAll(`#monitored-branches-list .branch-tag[data-branch="${bA}"], #monitored-branches-list .branch-tag[data-branch="${bB}"]`).forEach(tag => {
                         tag.classList.toggle('highlight-secondary', active);
                     });
+                    // PALETTE: Highlight matching scenario types
+                    const scenarios = (row.getAttribute('data-scenarios') || '').split(' ');
+                    scenarios.forEach(s => {
+                        if (s.trim()) {
+                            document.querySelectorAll(`.scenario-types li[data-scenario="${s.trim()}"]`).forEach(item => {
+                                item.classList.toggle('highlight-secondary', active);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        function toggleScenarioHighlight(scenario, active) {
+            document.querySelectorAll(`.scenario-types li[data-scenario="${scenario}"]`).forEach(item => {
+                item.classList.toggle('highlight-secondary', active);
+            });
+            document.querySelectorAll(`tr[data-scenarios]`).forEach(row => {
+                const scenarios = (row.getAttribute('data-scenarios') || '').split(' ');
+                if (scenarios.includes(scenario)) {
+                    row.classList.toggle('highlight', active);
+                    // PALETTE: Also highlight the branches for these rows
+                    const bA = row.getAttribute('data-branch-a');
+                    const bB = row.getAttribute('data-branch-b');
+                    document.querySelectorAll(`#monitored-branches-list .branch-tag[data-branch="${bA}"], #monitored-branches-list .branch-tag[data-branch="${bB}"]`).forEach(tag => {
+                        tag.classList.toggle('highlight-secondary', active);
+                    });
                 }
             });
         }
@@ -281,6 +312,11 @@ template = '''
                     table.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             };
+            const scenario = item.getAttribute('data-scenario');
+            item.addEventListener('mouseenter', () => toggleScenarioHighlight(scenario, true));
+            item.addEventListener('mouseleave', () => toggleScenarioHighlight(scenario, false));
+            item.addEventListener('focusin', () => toggleScenarioHighlight(scenario, true));
+            item.addEventListener('focusout', () => toggleScenarioHighlight(scenario, false));
             item.addEventListener('click', applyFilter);
             item.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -399,6 +435,15 @@ template = '''
             const highlightRow = (active) => {
                 toggleHighlight(row.getAttribute('data-branch-a'), active);
                 toggleHighlight(row.getAttribute('data-branch-b'), active);
+                // PALETTE: Highlight matching scenario types
+                const scenarios = (row.getAttribute('data-scenarios') || '').split(' ');
+                scenarios.forEach(s => {
+                    if (s.trim()) {
+                        document.querySelectorAll(`.scenario-types li[data-scenario="${s.trim()}"]`).forEach(item => {
+                            item.classList.toggle('highlight-secondary', active);
+                        });
+                    }
+                });
             };
             row.addEventListener('mouseenter', () => highlightRow(true));
             row.addEventListener('mouseleave', () => highlightRow(false));
@@ -432,6 +477,17 @@ template = '''
 @app.route('/')
 def dashboard():
     branches = git_utils.list_branches()
+    # PALETTE: Determine main branch for visualization
+    if 'main' in branches:
+        main_branch = 'main'
+    elif 'master' in branches:
+        main_branch = 'master'
+    else:
+        try:
+            main_branch = git_utils.repo.active_branch.name
+        except:
+            main_branch = 'main'
+
     predictions = predictor.predict_conflicts(branches)
 
     # BOLT: Calculate scenario types in a single pass over predictions
@@ -460,6 +516,7 @@ def dashboard():
         template,
         nonce=g.nonce,
         branches=branches,
+        main_branch=main_branch,
         predictions=predictions,
         conflicting_branches=conflicting_branches,
         scenario_types=scenario_types,
