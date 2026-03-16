@@ -10,24 +10,33 @@ sys.path.append(os.path.join(os.getcwd(), 'src'))
 from predictor import ConflictPredictor
 from git_utils import GitUtils
 
-def setup_large_diff_repo(tmp_path, num_branches=10, lines_per_file=1000):
-    repo_dir = tmp_path / "large_diff_repo"
+def setup_large_diff_repo(tmp_path, num_branches=5, lines_per_file=500):
+    # Resolve to absolute path to avoid confusion for GitPython
+    repo_dir = Path(tmp_path).resolve() / "large_diff_repo"
     if repo_dir.exists():
         shutil.rmtree(repo_dir)
-    repo_dir.mkdir()
+    repo_dir.mkdir(parents=True, exist_ok=True)
     repo = git.Repo.init(str(repo_dir))
 
     # Initial commit with a large file
     file_path = repo_dir / "large_file.txt"
     content = "\n".join([f"Line {i}" for i in range(lines_per_file)])
     file_path.write_text(content + "\n")
-    repo.index.add([str(file_path)])
+
+    # Add using relative path from repo root or absolute path
+    repo.index.add(["large_file.txt"])
     repo.index.commit("initial")
 
     branches = []
     for i in range(num_branches):
         branch_name = f"branch_{i}"
-        repo.git.checkout('master' if 'master' in repo.heads else repo.active_branch.name)
+        # Ensure we start from 'master' or 'main'
+        main_name = 'master' if 'master' in [h.name for h in repo.heads] else 'main'
+        if main_name not in [h.name for h in repo.heads]:
+            # If neither exists, we're likely on the first branch created by init
+            main_name = repo.active_branch.name
+
+        repo.git.checkout(main_name)
         repo.git.checkout('-b', branch_name)
 
         # Modify one line in the middle
@@ -35,25 +44,18 @@ def setup_large_diff_repo(tmp_path, num_branches=10, lines_per_file=1000):
         lines[lines_per_file // 2 + i] = f"Modified by {branch_name}"
         file_path.write_text("\n".join(lines) + "\n")
 
-        repo.index.add([str(file_path)])
+        repo.index.add(["large_file.txt"])
         repo.index.commit(f"commit {i}")
         branches.append(branch_name)
 
     return str(repo_dir), branches
 
-def run_benchmark(repo_path, branches, unified_value=3):
+def run_benchmark(repo_path, branches):
     git_utils = GitUtils(repo_path)
     predictor = ConflictPredictor(repo_path)
 
-    # Monkeypatch git_utils to use specific unified value
-    original_get_diff = git_utils.get_diff_between_branches
-    def patched_get_diff(a, b, unified=None):
-        u = unified if unified is not None else unified_value
-        return git_utils.repo.git.diff(f'{a}..{b}', unified=u)
-
-    # We need to reach into predictor and change its git_utils
-    predictor.git_utils = git_utils
-    git_utils.get_diff_between_branches = patched_get_diff
+    # Disable cache to measure raw performance
+    predictor.cache.clear()
 
     start_time = time.perf_counter()
     # Force determination of main branch so it doesn't vary
@@ -62,32 +64,33 @@ def run_benchmark(repo_path, branches, unified_value=3):
     except:
         main_branch = branches[0]
 
-    predictions = predictor.predict_conflicts([main_branch] + branches)
+    predictor.predict_conflicts([main_branch] + branches)
     end_time = time.perf_counter()
 
-    return end_time - start_time, len(predictions)
+    return end_time - start_time
 
 def main():
-    tmp_path = Path("/tmp/bolt_unified_bench")
-    tmp_path.mkdir(exist_ok=True)
+    # Use a local path to avoid potential permission issues in /tmp
+    tmp_path = Path("./tmp_bolt_bench").resolve()
+    tmp_path.mkdir(exist_ok=True, parents=True)
 
-    num_branches = 20
-    lines_per_file = 5000
+    num_branches = 5
+    lines_per_file = 500
     repo_path, branches = setup_large_diff_repo(tmp_path, num_branches=num_branches, lines_per_file=lines_per_file)
 
     print(f"Benchmarking with {num_branches} branches and {lines_per_file} lines per file...")
 
     # Warm up
-    run_benchmark(repo_path, branches, unified_value=3)
+    run_benchmark(repo_path, branches)
 
-    time_u3, pred_count = run_benchmark(repo_path, branches, unified_value=3)
-    print(f"Unified=3 (default): {time_u3:.4f} seconds")
+    times = []
+    for _ in range(5):
+        t = run_benchmark(repo_path, branches)
+        times.append(t)
+        print(f"Run: {t:.4f}s")
 
-    time_u0, _ = run_benchmark(repo_path, branches, unified_value=0)
-    print(f"Unified=0:           {time_u0:.4f} seconds")
-
-    improvement = (time_u3 - time_u0) / time_u3 * 100
-    print(f"Improvement: {improvement:.2f}%")
+    avg_time = sum(times) / len(times)
+    print(f"Average time: {avg_time:.4f}s")
 
     # Cleanup
     shutil.rmtree(repo_path)
