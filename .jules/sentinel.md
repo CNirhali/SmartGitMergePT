@@ -67,3 +67,8 @@
 **Vulnerability:** URL validation could be bypassed using percent-encoded hostnames (e.g., %6c%6f%63%61%6c%68%6f%73%74), trailing dots (e.g., localhost.), and shorthand IP notation (e.g., 127.1).
 **Learning:** Simple string matching and even basic `urlparse` are insufficient for SSRF protection as they don't account for various ways hostnames can be represented.
 **Prevention:** Normalize hostnames by unquoting and stripping trailing dots before validation. Use `socket.inet_aton` to resolve shorthand IP notations and validate the resulting IP against loopback and private ranges.
+
+## 2026-03-16 - [HTML Sanitization Bypass via Nested Tags]
+**Vulnerability:** `InputValidator._sanitize_html` was vulnerable to bypass via nested tags (e.g., `<scr<script>ipt>`) and nested protocols (e.g., `javajavascript:script:`).
+**Learning:** Single-pass regex substitution is insufficient for sanitization as it can leave behind parts of the string that combine to form new malicious payloads.
+**Prevention:** Use recursive sanitization (fixed-point iteration) with a reasonable iteration limit to ensure all nested malicious patterns are fully removed. Additionally, use regex patterns that match innermost tags first (e.g., `<[^<>]*>`) to facilitate clean removal during recursion.

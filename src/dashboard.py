@@ -532,7 +532,9 @@ def add_security_headers(response):
     csp = (
         "default-src 'self'; "
         f"style-src 'self' 'nonce-{g.get('nonce', '')}'; "
-        f"script-src 'self' 'nonce-{g.get('nonce', '')}'"
+        f"script-src 'self' 'nonce-{g.get('nonce', '')}'; "
+        "object-src 'none'; "
+        "base-uri 'self'"
     )
     response.headers['Content-Security-Policy'] = csp
     return response
