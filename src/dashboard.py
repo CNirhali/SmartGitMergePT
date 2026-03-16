@@ -107,6 +107,12 @@ template = '''
         .scenario-types li:hover { background-color: #f6f8fa; }
         .scenario-types li:focus-within { background-color: #f6f8fa; outline: 2px solid #0969da; outline-offset: -2px; }
         .scenario-types li.highlight-secondary { background-color: #ddf4ff; border-color: #0969da; }
+        @media (max-width: 600px) {
+            body { margin: 1em; }
+            .summary { flex-direction: column; }
+            .summary-item { width: auto; }
+            .filter-input { max-width: none; }
+        }
     </style>
 </head>
 <body>
@@ -139,7 +145,7 @@ template = '''
     {% for branch in branches %}
         {% set has_conflict = branch in conflicting_branches %}
         {% set is_base = branch == main_branch %}
-        <li><span class="branch-tag {{ 'has-conflict' if has_conflict }} {{ 'base-branch' if is_base }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (base branch)' if is_base }}{{ ' (has predicted conflicts)' if has_conflict }}" data-branch="{{ branch }}">{{ branch }}{% if is_base %} <small aria-hidden="true">(base)</small>{% endif %}</span></li>
+        <li><span class="branch-tag {{ 'has-conflict' if has_conflict }} {{ 'base-branch' if is_base }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (base branch)' if is_base }}{{ ' (has predicted conflicts)' if has_conflict }}" title="Click to copy & filter" data-branch="{{ branch }}">{{ branch }}{% if is_base %} <small aria-hidden="true">(base)</small>{% endif %}</span></li>
     {% endfor %}
     </ul>
 
@@ -172,17 +178,19 @@ template = '''
         </thead>
         <tbody>
             {% for pred in predictions %}
+            {% set is_base_a = pred['branches'][0] == main_branch %}
+            {% set is_base_b = pred['branches'][1] == main_branch %}
             <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}" data-scenarios="{{ 'file_overlap' if pred.get('files') }} {{ 'line_overlap' if pred.get('line_conflicts') }} {{ 'semantic_conflict' if pred.get('semantic_conflict') }}">
                 <td>
-                    <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}</span>
+                    <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Click to copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                     <span class="branch-sep" aria-hidden="true">↔</span>
-                    <span class="branch-tag" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][1] }}" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}</span>
+                    <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Click to copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                 </td>
                 <td>
                     {% if pred['files'] %}
                         <span class="sr-only">File Overlap</span>
                         {% for file in pred['files'] %}
-                            <code class="file-tag" role="button" tabindex="0" aria-label="Click to copy file path: {{ file }}" data-copy="{{ file }}">{{ file }}</code>{% if not loop.last %}, {% endif %}
+                            <code class="file-tag" role="button" tabindex="0" aria-label="Click to copy file path: {{ file }}" title="Click to copy" data-copy="{{ file }}">{{ file }}</code>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     {% else %}
                         <span class="absent" aria-label="No files overlap">—</span>
@@ -329,7 +337,14 @@ template = '''
         document.querySelectorAll('.branch-tag, .file-tag').forEach(tag => {
             const isFile = tag.classList.contains('file-tag');
             const attr = isFile ? 'data-copy' : 'data-branch';
-            tag.addEventListener('click', () => copyToClipboard(tag, attr));
+            tag.addEventListener('click', () => {
+                copyToClipboard(tag, attr);
+                // PALETTE: If clicked in the monitored branches list, also apply filter
+                if (tag.closest('#monitored-branches-list')) {
+                    filterInput.value = tag.getAttribute('data-branch');
+                    filterInput.dispatchEvent(new Event('input'));
+                }
+            });
 
             if (isFile) {
                 tag.addEventListener('mouseenter', () => toggleFileHighlight(tag.getAttribute('data-copy'), true));
