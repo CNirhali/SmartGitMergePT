@@ -72,3 +72,8 @@
 **Vulnerability:** `InputValidator._sanitize_html` was vulnerable to bypass via nested tags (e.g., `<scr<script>ipt>`) and nested protocols (e.g., `javajavascript:script:`).
 **Learning:** Single-pass regex substitution is insufficient for sanitization as it can leave behind parts of the string that combine to form new malicious payloads.
 **Prevention:** Use recursive sanitization (fixed-point iteration) with a reasonable iteration limit to ensure all nested malicious patterns are fully removed. Additionally, use regex patterns that match innermost tags first (e.g., `<[^<>]*>`) to facilitate clean removal during recursion.
+
+## 2025-05-16 - [Argument Injection in Git Wrapper]
+**Vulnerability:** `MistralCodeReviewer._get_file_diff` was vulnerable to argument injection, allowing a file with a name starting with a dash (e.g., `--name-only`) to inject options into the `git diff` command.
+**Learning:** Positional arguments in CLI wrappers can be misinterpreted as options if they start with a hyphen, potentially leading to unauthorized data exposure or behavior modification.
+**Prevention:** Always use the `--` separator to explicitly terminate option parsing before passing positional arguments like file paths or branch names to Git commands.

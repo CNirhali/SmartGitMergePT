@@ -170,8 +170,9 @@ class MistralCodeReviewer:
     def _get_file_diff(self, file_path: str) -> str:
         """Get diff for staged changes in a file"""
         try:
+            # 🛡️ Sentinel: Use '--' to separate options from pathspec to prevent argument injection
             result = subprocess.run(
-                ["git", "diff", "--cached", file_path],
+                ["git", "diff", "--cached", "--", file_path],
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
