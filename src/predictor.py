@@ -3,6 +3,7 @@ from optimizer import SmartCache, CacheConfig, CacheStrategy
 from typing import List, Dict, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import difflib
+import collections
 
 class ConflictPredictor:
     def __init__(self, repo_path: str = "."):
@@ -88,13 +89,12 @@ class ConflictPredictor:
 
         # BOLT: Build a file-to-branches index to optimize pairwise comparison
         # This transforms the O(N^2) search into a more efficient targeted check
-        file_to_branches = {}
+        # BOLT: Using defaultdict for O(1) initialization of list entries
+        file_to_branches = collections.defaultdict(list)
         for branch, data in branch_data.items():
             if branch == main_branch:
                 continue
             for file in data['files']:
-                if file not in file_to_branches:
-                    file_to_branches[file] = []
                 file_to_branches[file].append(branch)
 
         # BOLT: Only check pairs of branches that actually share at least one modified file
@@ -116,9 +116,10 @@ class ConflictPredictor:
 
                     # BOLT: Using pre-calculated line sets per file
                     # Only check line-level overlap for files that both branches modified
+                    # BOLT: Use isdisjoint() for O(min(len_a, len_b)) and early exit
                     line_conflicts = False
                     for common_f in overlap:
-                        if data_a['lines'].get(common_f) & data_b['lines'].get(common_f):
+                        if not data_a['lines'][common_f].isdisjoint(data_b['lines'][common_f]):
                             line_conflicts = True
                             break
 
@@ -166,8 +167,8 @@ class ConflictPredictor:
             c0 = line[0]
             if c0 == '+' or c0 == '-':
                 if current_lines is not None:
-                    # Skip +++ or --- headers
-                    if len(line) >= 3 and line[1] == c0 and line[2] == c0:
+                    # BOLT: Optimized header skip check
+                    if line.startswith(c0 * 3):
                         continue
                     # BOLT: Using direct indexing to avoid slice allocation
                     current_lines.add(line[1:])
@@ -195,7 +196,7 @@ class ConflictPredictor:
         files_b, lines_by_file_b = self._get_diff_metadata(diff_b)
         overlap = files_a & files_b
         for common_file in overlap:
-            if lines_by_file_a.get(common_file) & lines_by_file_b.get(common_file):
+            if not lines_by_file_a[common_file].isdisjoint(lines_by_file_b[common_file]):
                 return True
         return False
 
