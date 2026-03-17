@@ -145,9 +145,11 @@ class InputValidator:
         ), re.IGNORECASE)
 
         # BOLT: Pre-compile HTML patterns
-        self._html_tag_re = re.compile(r'<[^>]+>')
-        self._script_tag_re = re.compile(r'<script[^>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
-        self._js_url_re = re.compile(r'javascript:', re.IGNORECASE)
+        # 🛡️ Sentinel: Use innermost matching for tags to support recursive sanitization
+        self._html_tag_re = re.compile(r'<[^<>]*>')
+        self._script_tag_re = re.compile(r'<script[^<>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
+        # 🛡️ Sentinel: Expand protocol blocking to include vbscript and data
+        self._dangerous_protocol_re = re.compile(r'(javascript|vbscript|data):', re.IGNORECASE)
     
     def validate_string(self, value: str, max_length: int = 1000, allow_html: bool = False) -> Tuple[bool, str]:
         """Validate and sanitize string input"""
@@ -258,19 +260,28 @@ class InputValidator:
         )
     
     def _sanitize_html(self, text: str) -> str:
-        """Basic HTML sanitization"""
+        """Robust recursive HTML sanitization to prevent nested tag/protocol bypasses"""
         # BOLT: O(N) fast-path check to avoid expensive regex substitutions if safe
-        if '<' not in text and 'javascript:' not in text.lower():
-            # If no tags and no JS URLs, we only need html.escape for safety
+        # 🛡️ Sentinel: Expand fast-path to check for other dangerous protocols
+        if '<' not in text and not any(p in text.lower() for p in ['javascript:', 'vbscript:', 'data:']):
+            # If no tags and no dangerous protocols, we only need html.escape for safety
             return html.escape(text)
 
-        # BOLT: Use pre-compiled regex for better performance
-        # Remove common HTML tag patterns
-        text = self._html_tag_re.sub('', text)
-        # Remove script tags
-        text = self._script_tag_re.sub('', text)
-        # Remove javascript: URLs
-        text = self._js_url_re.sub('', text)
+        # 🛡️ Sentinel: Recursive sanitization to handle bypasses like <scr<script>ipt>
+        max_iterations = 5
+        for _ in range(max_iterations):
+            original_text = text
+            # BOLT: Use pre-compiled regex for better performance
+            # 🛡️ Sentinel: Remove script tags first to capture content
+            text = self._script_tag_re.sub('', text)
+            # Remove common HTML tag patterns
+            text = self._html_tag_re.sub('', text)
+            # Remove dangerous protocol URLs
+            text = self._dangerous_protocol_re.sub('', text)
+
+            if text == original_text:
+                break
+
         # Escape HTML characters last for robustness
         text = html.escape(text)
         return text
