@@ -34,6 +34,7 @@ template = '''
         .refresh-btn { margin-bottom: 1em; padding: 6px 12px; cursor: pointer; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; font-weight: 600; transition: background-color 0.2s; user-select: none; }
         .refresh-btn:hover { background: #f3f4f6; }
         .refresh-btn:active { background: #ebecf0; }
+        .refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .refresh-btn:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
         tr { transition: background-color 0.2s, border-color 0.2s; }
         code { background: #afb8c133; padding: 0.2em 0.4em; border-radius: 6px; font-size: 85%; transition: background-color 0.2s, color 0.2s; }
@@ -48,6 +49,7 @@ template = '''
         .branch-tag:active { background: #cfeeff; transform: translateY(1px); }
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
         .branch-tag.highlight-secondary { background: #ddf4ff; color: #0969da; border-color: #0969da; }
+        .branch-tag.active-filter { background: #0969da; color: white; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0969da; }
         .branch-tag.has-conflict::after { content: '•'; color: #cf222e; margin-left: 4px; font-weight: bold; }
         .branch-tag.base-branch { border-style: dashed; border-color: #57606a; }
         .branch-tag.base-branch small { color: #57606a; font-weight: normal; margin-left: 2px; }
@@ -56,6 +58,7 @@ template = '''
         .file-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
         .file-tag:active { background: #afb8c188; transform: translateY(1px); }
         .file-tag.highlight { background: #0969da; color: white; }
+        .copy-success { background-color: #dafbe1 !important; color: #1a7f37 !important; transition: background-color 0.2s; }
         tr.highlight { background-color: #ddf4ff; border-left: 2px solid #0969da; }
         .copy-tooltip { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #24292f; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; z-index: 1000; }
         .copy-tooltip.show { opacity: 1; }
@@ -106,6 +109,7 @@ template = '''
         .scenario-types li { padding: 4px 8px; border-radius: 6px; transition: background-color 0.2s, transform 0.1s; cursor: pointer; border: 1px solid transparent; }
         .scenario-types li:hover { background-color: #f6f8fa; }
         .scenario-types li:focus-within { background-color: #f6f8fa; outline: 2px solid #0969da; outline-offset: -2px; }
+        .scenario-types li.active-filter { background-color: #ddf4ff; border-color: #0969da; border-left: 4px solid #0969da; }
         .scenario-types li.highlight-secondary { background-color: #ddf4ff; border-color: #0969da; }
         @media (max-width: 600px) {
             body { margin: 1em; }
@@ -238,6 +242,7 @@ template = '''
                 tooltip.textContent = 'Copied!';
                 element.appendChild(tooltip);
 
+                element.classList.add('copy-success');
                 const announcer = document.getElementById('announcer');
                 if (announcer) {
                     announcer.textContent = `Copied ${text} to clipboard`;
@@ -245,6 +250,7 @@ template = '''
 
                 setTimeout(() => {
                     tooltip.remove();
+                    element.classList.remove('copy-success');
                     if (announcer) announcer.textContent = '';
                 }, 1000);
             });
@@ -343,6 +349,10 @@ template = '''
                 if (tag.closest('#monitored-branches-list')) {
                     filterInput.value = tag.getAttribute('data-branch');
                     filterInput.dispatchEvent(new Event('input'));
+                    const table = document.querySelector('table');
+                    if (table && window.getComputedStyle(table).display !== 'none') {
+                        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
             });
 
@@ -418,6 +428,12 @@ template = '''
             monitoredBranchTags.forEach(tag => {
                 const text = tag.getAttribute('data-branch').toLowerCase();
                 tag.style.display = text.includes(query) ? 'inline-block' : 'none';
+                tag.classList.toggle('active-filter', query !== '' && text === query);
+            });
+
+            document.querySelectorAll('.scenario-types li').forEach(li => {
+                const text = li.getAttribute('data-filter').toLowerCase();
+                li.classList.toggle('active-filter', query !== '' && text === query);
             });
 
             tableRows.forEach(row => {
