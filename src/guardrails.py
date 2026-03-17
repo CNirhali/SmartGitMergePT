@@ -262,10 +262,17 @@ class InputValidator:
     def _sanitize_html(self, text: str) -> str:
         """Robust recursive HTML sanitization to prevent nested tag/protocol bypasses"""
         # BOLT: O(N) fast-path check to avoid expensive regex substitutions if safe
-        # 🛡️ Sentinel: Expand fast-path to check for other dangerous protocols
-        if '<' not in text and not any(p in text.lower() for p in ['javascript:', 'vbscript:', 'data:']):
-            # If no tags and no dangerous protocols, we only need html.escape for safety
-            return html.escape(text)
+        if '<' not in text:
+            # Check for dangerous protocols only if a colon is present
+            if ':' not in text:
+                return html.escape(text)
+
+            # Pre-calculate lower case once to avoid multiple lower() calls
+            # 🛡️ Sentinel: Expand fast-path to check for other dangerous protocols
+            t_low = text.lower()
+            if not any(p in t_low for p in ['javascript:', 'vbscript:', 'data:']):
+                # If no tags and no dangerous protocols, we only need html.escape for safety
+                return html.escape(text)
 
         # 🛡️ Sentinel: Recursive sanitization to handle bypasses like <scr<script>ipt>
         max_iterations = 5

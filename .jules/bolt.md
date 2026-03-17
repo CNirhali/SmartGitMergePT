@@ -41,3 +41,7 @@
 ## 2025-06-10 - [Regex Pattern Combination and Fast-Pathing]
 **Learning:** Calling `re.search` multiple times in a loop (e.g., for security validation) is significantly slower than combining patterns into a single grouped regex. Additionally, for "clean" inputs, expensive regex substitutions in sanitization can be entirely bypassed with $O(N)$ string checks (like `in` or `str.contains`).
 **Action:** Combine multiple independent regex patterns into a single pre-compiled regex for initial "all-clear" checks. Implement $O(N)$ fast-paths to skip expensive processing for common safe inputs.
+
+## 2025-06-12 - [Hierarchical Fast-Path for String Sanitization]
+**Learning:** Initializing expensive operations like 'text.lower()' in a fast-path can still be a significant bottleneck for large inputs, even if it avoids regex. In this codebase, 'InputValidator._sanitize_html' was calling 'lower()' eagerly for every string without tags.
+**Action:** Use hierarchical checks: first check for simple character markers (like '<' or ':') before calling 'lower()' or starting regex searches. Pre-calculate 'lower()' once if multiple substring checks are needed to avoid redundant (N)$ passes.
