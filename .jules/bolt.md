@@ -45,3 +45,7 @@
 ## 2025-06-12 - [Hierarchical Fast-Path for String Sanitization]
 **Learning:** Initializing expensive operations like 'text.lower()' in a fast-path can still be a significant bottleneck for large inputs, even if it avoids regex. In this codebase, 'InputValidator._sanitize_html' was calling 'lower()' eagerly for every string without tags.
 **Action:** Use hierarchical checks: first check for simple character markers (like '<' or ':') before calling 'lower()' or starting regex searches. Pre-calculate 'lower()' once if multiple substring checks are needed to avoid redundant (N)$ passes.
+
+## 2025-06-15 - [Process-Specific Resource Monitoring]
+**Learning:** Using system-wide metrics like `psutil.virtual_memory().used` in a `ResourceManager` causes the application to throttle or trigger garbage collection due to unrelated "noisy neighbor" processes.
+**Action:** Always use process-specific metrics via `psutil.Process()` (e.g., `memory_info().rss` and `cpu_percent(interval=None)`) to ensure optimization logic is grounded in the application's actual resource footprint.

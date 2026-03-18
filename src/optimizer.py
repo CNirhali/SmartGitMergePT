@@ -311,27 +311,30 @@ class ResourceManager:
         self.memory_usage = deque(maxlen=100)
         self.cpu_usage = deque(maxlen=100)
         self.gc_stats = defaultdict(int)
+        # BOLT: Use process-specific monitoring to avoid false-positive throttling from system-wide load
+        self.process = psutil.Process()
         # Initialize CPU counter for non-blocking check_cpu_usage
-        psutil.cpu_percent(interval=None)
+        self.process.cpu_percent(interval=None)
     
     def check_memory_usage(self) -> Tuple[bool, float]:
         """Check current memory usage"""
-        memory = psutil.virtual_memory()
-        usage_mb = memory.used / (1024 * 1024)
+        # BOLT: Monitor process-specific RSS memory instead of system-wide used memory
+        usage_mb = self.process.memory_info().rss / (1024 * 1024)
         is_healthy = usage_mb < self.memory_limit_mb
         
         self.memory_usage.append({
             'timestamp': datetime.now(),
             'usage_mb': usage_mb,
-            'percent': memory.percent
+            'percent': (usage_mb / self.memory_limit_mb * 100) if self.memory_limit_mb > 0 else 0
         })
         
         return is_healthy, usage_mb
     
     def check_cpu_usage(self) -> Tuple[bool, float]:
         """Check current CPU usage (non-blocking)"""
+        # BOLT: Monitor process-specific CPU usage instead of system-wide average
         # interval=None returns the CPU usage since the last call or __init__
-        cpu_percent = psutil.cpu_percent(interval=None)
+        cpu_percent = self.process.cpu_percent(interval=None)
         is_healthy = cpu_percent < self.cpu_limit_percent
         
         self.cpu_usage.append({
