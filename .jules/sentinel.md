@@ -77,3 +77,8 @@
 **Vulnerability:** `MistralCodeReviewer._get_file_diff` was vulnerable to argument injection, allowing a file with a name starting with a dash (e.g., `--name-only`) to inject options into the `git diff` command.
 **Learning:** Positional arguments in CLI wrappers can be misinterpreted as options if they start with a hyphen, potentially leading to unauthorized data exposure or behavior modification.
 **Prevention:** Always use the `--` separator to explicitly terminate option parsing before passing positional arguments like file paths or branch names to Git commands.
+
+## 2026-03-21 - [XSS Bypass via Protocol Obfuscation]
+**Vulnerability:** `InputValidator._sanitize_html` and `validate_url` could be bypassed using whitespace or newlines within dangerous protocols (e.g., `j\navascript:`) or before the colon (e.g., `javascript :`).
+**Learning:** Browser parsers are extremely lenient and often strip whitespace within URI schemes. Simple substring matching or literal regexes are insufficient for protocol filtering.
+**Prevention:** Use regular expressions that account for optional whitespace (`\s*`) between every character of the protocol name and before the colon separator. Always use pre-compiled regexes for both the fast-path check and the actual sanitization to ensure consistency.
