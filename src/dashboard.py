@@ -4,6 +4,7 @@ from predictor import ConflictPredictor
 import argparse
 from datetime import datetime, timezone
 import secrets
+from collections import Counter
 
 app = Flask(__name__)
 
@@ -50,7 +51,20 @@ template = '''
         .branch-tag.highlight { background: #0969da; color: white; border-color: #0969da; }
         .branch-tag.highlight-secondary { background: #ddf4ff; color: #0969da; border-color: #0969da; }
         .branch-tag.active-filter { background: #0969da; color: white; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0969da; }
-        .branch-tag.has-conflict::after { content: '•'; color: #cf222e; margin-left: 4px; font-weight: bold; }
+        .branch-tag .conflict-count {
+            background: #cf222e;
+            color: white;
+            border-radius: 10px;
+            padding: 0 5px;
+            font-size: 10px;
+            margin-left: 4px;
+            vertical-align: middle;
+            display: inline-block;
+            line-height: 1.4;
+            min-width: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
         .branch-tag.base-branch { border-style: dashed; border-color: #57606a; }
         .branch-tag.base-branch small { color: #57606a; font-weight: normal; margin-left: 2px; }
         .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
@@ -100,7 +114,14 @@ template = '''
         }
         .no-results { display: none; text-align: center; padding: 20px; color: #57606a; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; margin-top: 1em; }
         .filter-container { display: flex; align-items: center; gap: 8px; }
-        #clear-filter { margin-bottom: 0; padding: 4px 8px; display: none; }
+        #clear-filter {
+            margin-bottom: 0;
+            padding: 4px 8px;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #clear-filter.visible { display: inline-block; opacity: 1; }
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
         #monitored-branches-list { margin-bottom: 2em; list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
         .scenario-list { list-style: none; padding-left: 0; }
@@ -147,9 +168,9 @@ template = '''
     <h2>Monitored Branches</h2>
     <ul id="monitored-branches-list">
     {% for branch in branches %}
-        {% set has_conflict = branch in conflicting_branches %}
+        {% set conflict_count = conflicting_branches.get(branch, 0) %}
         {% set is_base = branch == main_branch %}
-        <li><span class="branch-tag {{ 'has-conflict' if has_conflict }} {{ 'base-branch' if is_base }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ branch }}{{ ' (base branch)' if is_base }}{{ ' (has predicted conflicts)' if has_conflict }}" title="Click to copy & filter" data-branch="{{ branch }}">{{ branch }}{% if is_base %} <small aria-hidden="true">(base)</small>{% endif %}</span></li>
+        <li><span class="branch-tag {{ 'base-branch' if is_base }}" role="button" tabindex="0" aria-label="Filter and copy branch name: {{ branch }}{{ ' (base branch)' if is_base }}{{ ' (' ~ conflict_count ~ ' predicted conflicts)' if conflict_count > 0 }}" title="Filter and copy" data-branch="{{ branch }}">{{ branch }}{% if is_base %} <small aria-hidden="true">(base)</small>{% endif %}{% if conflict_count > 0 %}<span class="conflict-count" title="{{ conflict_count }} conflicts">{{ conflict_count }}</span>{% endif %}</span></li>
     {% endfor %}
     </ul>
 
@@ -186,9 +207,9 @@ template = '''
             {% set is_base_b = pred['branches'][1] == main_branch %}
             <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}" data-scenarios="{{ 'file_overlap' if pred.get('files') }} {{ 'line_overlap' if pred.get('line_conflicts') }} {{ 'semantic_conflict' if pred.get('semantic_conflict') }}">
                 <td>
-                    <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Click to copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
+                    <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-label="Filter and copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Filter and copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                     <span class="branch-sep" aria-hidden="true">↔</span>
-                    <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-label="Click to copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Click to copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
+                    <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                 </td>
                 <td>
                     {% if pred['files'] %}
@@ -345,8 +366,8 @@ template = '''
             const attr = isFile ? 'data-copy' : 'data-branch';
             tag.addEventListener('click', () => {
                 copyToClipboard(tag, attr);
-                // PALETTE: If clicked in the monitored branches list, also apply filter
-                if (tag.closest('#monitored-branches-list')) {
+                // PALETTE: Universal filtering for ALL branch tags
+                if (!isFile) {
                     filterInput.value = tag.getAttribute('data-branch');
                     filterInput.dispatchEvent(new Event('input'));
                     const table = document.querySelector('table');
@@ -423,11 +444,19 @@ template = '''
             }
 
             let visibleRowsCount = 0;
-            clearFilterBtn.style.display = query ? 'inline-block' : 'none';
+            if (query) {
+                clearFilterBtn.classList.add('visible');
+            } else {
+                clearFilterBtn.classList.remove('visible');
+            }
 
-            monitoredBranchTags.forEach(tag => {
+            // Update all branch tags (monitored list + table) for highlighting
+            document.querySelectorAll('.branch-tag').forEach(tag => {
                 const text = tag.getAttribute('data-branch').toLowerCase();
-                tag.style.display = text.includes(query) ? 'inline-block' : 'none';
+                // Only hide in the monitored list
+                if (tag.closest('#monitored-branches-list')) {
+                    tag.style.display = text.includes(query) ? 'inline-block' : 'none';
+                }
                 tag.classList.toggle('active-filter', query !== '' && text === query);
             });
 
@@ -526,7 +555,7 @@ def dashboard():
     line_overlap_count = 0
     semantic_conflict_count = 0
 
-    conflicting_branches = set()
+    conflicting_branches = Counter()
     for pred in predictions:
         if pred.get('files'):
             file_overlap_count += 1
@@ -535,8 +564,9 @@ def dashboard():
         if pred.get('semantic_conflict'):
             semantic_conflict_count += 1
 
-        # PALETTE: Identify branches with conflicts for at-a-glance status
-        conflicting_branches.update(pred['branches'])
+        # PALETTE: Count conflicts per branch for more informative status
+        for b in pred['branches']:
+            conflicting_branches[b] += 1
 
     scenario_types = {
         'file_overlap': file_overlap_count,
