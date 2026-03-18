@@ -148,8 +148,11 @@ class InputValidator:
         # 🛡️ Sentinel: Use innermost matching for tags to support recursive sanitization
         self._html_tag_re = re.compile(r'<[^<>]*>')
         self._script_tag_re = re.compile(r'<script[^<>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
-        # 🛡️ Sentinel: Expand protocol blocking to include vbscript and data
-        self._dangerous_protocol_re = re.compile(r'(javascript|vbscript|data):', re.IGNORECASE)
+        # 🛡️ Sentinel: Support optional whitespace within/after dangerous protocols to prevent bypasses (e.g. j a v a s c r i p t : )
+        self._dangerous_protocol_re = re.compile(
+            r'(j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t|v\s*b\s*s\s*c\s*r\s*i\s*p\s*t|d\s*a\s*t\s*a)\s*:',
+            re.IGNORECASE
+        )
     
     def validate_string(self, value: str, max_length: int = 1000, allow_html: bool = False) -> Tuple[bool, str]:
         """Validate and sanitize string input"""
@@ -267,10 +270,8 @@ class InputValidator:
             if ':' not in text:
                 return html.escape(text)
 
-            # Pre-calculate lower case once to avoid multiple lower() calls
-            # 🛡️ Sentinel: Expand fast-path to check for other dangerous protocols
-            t_low = text.lower()
-            if not any(p in t_low for p in ['javascript:', 'vbscript:', 'data:']):
+            # 🛡️ Sentinel: Use the pre-compiled regex for fast-path check as well
+            if not self._dangerous_protocol_re.search(text):
                 # If no tags and no dangerous protocols, we only need html.escape for safety
                 return html.escape(text)
 

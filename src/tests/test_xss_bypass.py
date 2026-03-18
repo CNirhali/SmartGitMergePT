@@ -26,3 +26,15 @@ def test_html_sanitization_bypass():
     data_url = "data:text/html,<script>alert(1)</script>"
     is_valid, sanitized = validator.validate_string(data_url)
     assert "data:" not in sanitized.lower()
+
+    # Test obfuscated protocol bypass
+    # java\nscript:alert(1) should be fully sanitized
+    obfuscated_protocol = "java\nscript:alert(1)"
+    is_valid, sanitized = validator.validate_string(obfuscated_protocol)
+    assert "javascript" not in sanitized.lower()
+    assert "java\nscript" not in sanitized.lower()
+
+    # javascript :alert(1) (space before colon) should be fully sanitized
+    space_before_colon = "javascript :alert(1)"
+    is_valid, sanitized = validator.validate_string(space_before_colon)
+    assert "javascript" not in sanitized.lower()
