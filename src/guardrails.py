@@ -203,15 +203,23 @@ class InputValidator:
             return False, f"Path validation error: {str(e)}"
     
     def validate_url(self, url: str) -> Tuple[bool, str]:
-        """Validate URL for security (SSRF protection)"""
+        """Validate URL for security (SSRF and protocol bypass protection)"""
         try:
-            # Check for null bytes to prevent bypasses
+            if not isinstance(url, str):
+                return False, "URL must be a string"
+
+            # 🛡️ Sentinel: Strip whitespace and check for null bytes to prevent bypasses
+            url = url.strip()
             if '\0' in url:
                 return False, "Null byte detected in URL"
 
+            # 🛡️ Sentinel: Use pre-compiled regex for robust protocol detection (e.g. j a v a s c r i p t :)
+            if self._dangerous_protocol_re.search(url):
+                return False, "Dangerous URL protocol detected"
+
             parsed = urlparse(url)
             
-            # Check for dangerous protocols
+            # Check for dangerous protocols via parsed scheme as a second layer
             dangerous_protocols = {'file', 'javascript', 'data', 'vbscript', 'gopher', 'dict', 'ldap', 'ftp', 'tftp'}
             if parsed.scheme.lower() in dangerous_protocols:
                 return False, f"Dangerous URL protocol detected: {parsed.scheme}"
@@ -423,13 +431,16 @@ class PerformanceMonitor:
         return True, "Performance is healthy"
 
 class SecurityMonitor:
-    """Security monitoring and threat detection"""
+    """Security monitoring and threat detection with resource limits"""
     
-    def __init__(self):
-        self.security_events: List[SecurityEvent] = []
-        self.suspicious_ips: Set[str] = set()
-        self.failed_attempts: Dict[str, int] = defaultdict(int)
-        self.blocked_ips: Set[str] = set()
+    def __init__(self, max_tracked_ips: int = 1000):
+        # 🛡️ Sentinel: Use bounded deque to prevent memory exhaustion DoS
+        self.security_events = deque(maxlen=1000)
+        # 🛡️ Sentinel: Use bounded OrderedDict for IP tracking to prevent memory exhaustion
+        self.max_tracked_ips = max_tracked_ips
+        self.suspicious_ips = OrderedDict()
+        self.failed_attempts = OrderedDict()
+        self.blocked_ips = OrderedDict()
         self.rate_limiter = RateLimiter(max_requests=100, window_seconds=3600)
     
     def record_security_event(self, event_type: str, severity: SecurityLevel, 
@@ -457,19 +468,36 @@ class SecurityMonitor:
             logger.warning(f"SECURITY ALERT: {event_type} - {description}")
     
     def _check_suspicious_activity(self, ip_address: str, event: SecurityEvent):
-        """Check for suspicious activity patterns"""
+        """Check for suspicious activity patterns with memory protection"""
         # Track failed attempts
         if "failed" in event.event_type.lower():
-            self.failed_attempts[ip_address] += 1
+            # Bounded update for failed_attempts
+            if ip_address in self.failed_attempts:
+                self.failed_attempts.move_to_end(ip_address)
+                self.failed_attempts[ip_address] += 1
+            else:
+                if len(self.failed_attempts) >= self.max_tracked_ips:
+                    self.failed_attempts.popitem(last=False)
+                self.failed_attempts[ip_address] = 1
             
             # Block IP after 5 failed attempts
             if self.failed_attempts[ip_address] >= 5:
-                self.blocked_ips.add(ip_address)
+                if ip_address in self.blocked_ips:
+                    self.blocked_ips.move_to_end(ip_address)
+                else:
+                    if len(self.blocked_ips) >= self.max_tracked_ips:
+                        self.blocked_ips.popitem(last=False)
+                    self.blocked_ips[ip_address] = True
                 logger.warning(f"IP {ip_address} blocked due to multiple failed attempts")
         
         # Check rate limiting
         if not self.rate_limiter.is_allowed(ip_address):
-            self.suspicious_ips.add(ip_address)
+            if ip_address in self.suspicious_ips:
+                self.suspicious_ips.move_to_end(ip_address)
+            else:
+                if len(self.suspicious_ips) >= self.max_tracked_ips:
+                    self.suspicious_ips.popitem(last=False)
+                self.suspicious_ips[ip_address] = True
             logger.warning(f"Rate limit exceeded for IP {ip_address}")
     
     def is_ip_blocked(self, ip_address: str) -> bool:
