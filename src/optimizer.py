@@ -102,20 +102,25 @@ class SmartCache:
         
         # BOLT: Removed eager _load_persistent_cache() to speed up initialization
     
-    def _get_cache_key(self, key: str) -> str:
-        """BOLT: Consistently use MD5 hash for internal keying to support preloading and memory efficiency"""
+    def _get_cache_key(self, key: str, is_hash: bool = False) -> str:
+        """BOLT: Consistently use MD5 hash for internal keying to support preloading and memory efficiency.
+        If is_hash is True, the key is already hashed and should be used directly.
+        """
+        if is_hash:
+            return key
         return hashlib.md5(key.encode()).hexdigest()
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str, is_hash: bool = False) -> Optional[Any]:
         """Get value from cache"""
         try:
             # BOLT: Use internal keying to match preloaded persistent cache
-            cache_key = self._get_cache_key(key)
+            cache_key = self._get_cache_key(key, is_hash)
 
             # Try memory cache first
-            if cache_key in self.cache:
+            # BOLT: Use dict.get() for single-pass lookup optimization
+            value = self.cache.get(cache_key)
+            if value is not None:
                 self.hits += 1
-                value = self.cache[cache_key]
                 # Always decompress if it's a compressed string for transparency
                 return self._decompress_value(value)
             
@@ -136,11 +141,11 @@ class SmartCache:
             logger.error(f"Cache get error: {e}")
             return None
     
-    def set(self, key: str, value: Any) -> bool:
+    def set(self, key: str, value: Any, is_hash: bool = False) -> bool:
         """Set value in cache"""
         try:
             # BOLT: Use internal keying
-            cache_key = self._get_cache_key(key)
+            cache_key = self._get_cache_key(key, is_hash)
 
             # Compress if enabled
             if self.config.enable_compression:
@@ -159,11 +164,11 @@ class SmartCache:
             logger.error(f"Cache set error: {e}")
             return False
     
-    def delete(self, key: str) -> bool:
+    def delete(self, key: str, is_hash: bool = False) -> bool:
         """Delete value from cache"""
         try:
             # BOLT: Use internal keying
-            cache_key = self._get_cache_key(key)
+            cache_key = self._get_cache_key(key, is_hash)
 
             if cache_key in self.cache:
                 del self.cache[cache_key]
@@ -417,7 +422,8 @@ class PerformanceOptimizer:
                 cache_key = self._create_cache_key(func.__name__, args, kwargs)
                 
                 # Try to get from cache
-                cached_result = self.cache.get(cache_key)
+                # BOLT: Pass is_hash=True as _create_cache_key already returns an MD5 hash
+                cached_result = self.cache.get(cache_key, is_hash=True)
                 if cached_result is not None:
                     self.optimization_stats['cache_hits'] += 1
                     return cached_result
@@ -433,7 +439,8 @@ class PerformanceOptimizer:
                 self.function_timings[func.__name__].append(duration)
                 
                 # Cache result
-                self.cache.set(cache_key, result)
+                # BOLT: Pass is_hash=True as _create_cache_key already returns an MD5 hash
+                self.cache.set(cache_key, result, is_hash=True)
                 
                 return result
             
