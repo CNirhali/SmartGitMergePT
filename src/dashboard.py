@@ -170,21 +170,21 @@ template = '''
     {% for branch in branches %}
         {% set conflict_count = conflicting_branches.get(branch, 0) %}
         {% set is_base = branch == main_branch %}
-        <li><span class="branch-tag {{ 'base-branch' if is_base }}" role="button" tabindex="0" aria-label="Filter and copy branch name: {{ branch }}{{ ' (base branch)' if is_base }}{{ ' (' ~ conflict_count ~ ' predicted conflicts)' if conflict_count > 0 }}" title="Filter and copy" data-branch="{{ branch }}">{{ branch }}{% if is_base %} <small aria-hidden="true">(base)</small>{% endif %}{% if conflict_count > 0 %}<span class="conflict-count" title="{{ conflict_count }} conflicts">{{ conflict_count }}</span>{% endif %}</span></li>
+        <li><span class="branch-tag {{ 'base-branch' if is_base }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ branch }}{{ ' (base branch)' if is_base }}{{ ' (' ~ conflict_count ~ ' predicted conflicts)' if conflict_count > 0 }}" title="Filter and copy" data-branch="{{ branch }}">{{ branch }}{% if is_base %} <small aria-hidden="true">(base)</small>{% endif %}{% if conflict_count > 0 %}<span class="conflict-count" title="{{ conflict_count }} conflicts">{{ conflict_count }}</span>{% endif %}</span></li>
     {% endfor %}
     </ul>
 
     <h2>Scenario Types</h2>
     <ul class="scenario-types" style="list-style: none; padding-left: 0;">
-        <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="File Overlap" data-scenario="file_overlap" aria-label="Filter by File Overlap: {{ scenario_types['file_overlap'] }} found">
+        <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}" role="button" tabindex="0" aria-pressed="false" data-filter="File Overlap" data-scenario="file_overlap" aria-label="Filter by File Overlap: {{ scenario_types['file_overlap'] }} found">
             {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>File Overlap</strong> ({{ scenario_types['file_overlap'] }}): Both branches modify the same file(s).
         </li>
-        <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}" role="button" tabindex="0" data-filter="Line Overlap" data-scenario="line_overlap" aria-label="Filter by Line Overlap: {{ scenario_types['line_overlap'] }} found">
+        <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}" role="button" tabindex="0" aria-pressed="false" data-filter="Line Overlap" data-scenario="line_overlap" aria-label="Filter by Line Overlap: {{ scenario_types['line_overlap'] }} found">
             {% if scenario_types['line_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>Line Overlap</strong> ({{ scenario_types['line_overlap'] }}): Both branches change the same or similar lines in a file.
         </li>
-        <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}" role="button" tabindex="0" data-filter="Semantic Conflict" data-scenario="semantic_conflict" aria-label="Filter by Semantic Conflict: {{ scenario_types['semantic_conflict'] }} found">
+        <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}" role="button" tabindex="0" aria-pressed="false" data-filter="Semantic Conflict" data-scenario="semantic_conflict" aria-label="Filter by Semantic Conflict: {{ scenario_types['semantic_conflict'] }} found">
             {% if scenario_types['semantic_conflict'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
             <strong>Semantic Conflict</strong> ({{ scenario_types['semantic_conflict'] }}): Changes are different but may cause logical or functional conflicts.
         </li>
@@ -207,9 +207,9 @@ template = '''
             {% set is_base_b = pred['branches'][1] == main_branch %}
             <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}" data-scenarios="{{ 'file_overlap' if pred.get('files') }} {{ 'line_overlap' if pred.get('line_conflicts') }} {{ 'semantic_conflict' if pred.get('semantic_conflict') }}">
                 <td>
-                    <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-label="Filter and copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Filter and copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
+                    <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Filter and copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                     <span class="branch-sep" aria-hidden="true">↔</span>
-                    <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
+                    <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                 </td>
                 <td>
                     {% if pred['files'] %}
@@ -338,12 +338,13 @@ template = '''
         document.querySelectorAll('.scenario-types li').forEach(item => {
             const applyFilter = () => {
                 const filterValue = item.getAttribute('data-filter');
-                filterInput.value = filterValue;
+                // PALETTE: Toggle filter off if already active
+                filterInput.value = filterInput.value.toLowerCase() === filterValue.toLowerCase() ? '' : filterValue;
                 filterInput.dispatchEvent(new Event('input'));
                 filterInput.focus();
                 // Smooth scroll to table if not in view
                 const table = document.querySelector('table');
-                if (table && window.getComputedStyle(table).display !== 'none') {
+                if (table && window.getComputedStyle(table).display !== 'none' && filterInput.value !== '') {
                     table.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             };
@@ -368,10 +369,12 @@ template = '''
                 copyToClipboard(tag, attr);
                 // PALETTE: Universal filtering for ALL branch tags
                 if (!isFile) {
-                    filterInput.value = tag.getAttribute('data-branch');
+                    const branchName = tag.getAttribute('data-branch');
+                    // PALETTE: Toggle filter off if already active
+                    filterInput.value = filterInput.value.toLowerCase() === branchName.toLowerCase() ? '' : branchName;
                     filterInput.dispatchEvent(new Event('input'));
                     const table = document.querySelector('table');
-                    if (table && window.getComputedStyle(table).display !== 'none') {
+                    if (table && window.getComputedStyle(table).display !== 'none' && filterInput.value !== '') {
                         table.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
                 }
@@ -453,16 +456,22 @@ template = '''
             // Update all branch tags (monitored list + table) for highlighting
             document.querySelectorAll('.branch-tag').forEach(tag => {
                 const text = tag.getAttribute('data-branch').toLowerCase();
+                const isActive = query !== '' && text === query;
                 // Only hide in the monitored list
                 if (tag.closest('#monitored-branches-list')) {
                     tag.style.display = text.includes(query) ? 'inline-block' : 'none';
                 }
-                tag.classList.toggle('active-filter', query !== '' && text === query);
+                tag.classList.toggle('active-filter', isActive);
+                // PALETTE: Sync ARIA state
+                tag.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
 
             document.querySelectorAll('.scenario-types li').forEach(li => {
                 const text = li.getAttribute('data-filter').toLowerCase();
-                li.classList.toggle('active-filter', query !== '' && text === query);
+                const isActive = query !== '' && text === query;
+                li.classList.toggle('active-filter', isActive);
+                // PALETTE: Sync ARIA state
+                li.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
 
             tableRows.forEach(row => {
@@ -518,6 +527,8 @@ template = '''
             if (e.key === '/' && document.activeElement !== filterInput) {
                 e.preventDefault();
                 filterInput.focus();
+                // PALETTE: Select text on focus for easier overwriting
+                filterInput.select();
             }
             if (e.key === 'Escape') {
                 if (filterInput.value !== '') {
