@@ -19,14 +19,6 @@
 **Action:** Use `ThreadPoolExecutor` to parallelize I/O-bound `git` command calls. This can yield ~50% performance gains in data preparation phases for large branch sets.
 
 ## 2025-05-30 - [Targeted Pairwise Comparison via Inverted Index]
-**Learning:** Naive pairwise comparison of $ branches is (N^2)$, which is devastating for performance in large repositories. Using an inverted index (mapping files to branches that modified them) reduces the search space to only those pairs that actually share modified files.
-**Action:** When performing exhaustive pairwise checks on objects with shared attributes, always build an inverted index first to isolate relevant pairs.
-
-## 2025-05-30 - [Context-Aware Semantic Similarity]
-**Learning:** Running  on entire diff strings is wasteful and slow, especially when only a small portion of the diff (the overlapping files) is relevant to the conflict prediction. Trimming the input to only overlapping file content significantly improves execution speed and heuristic focus.
-**Action:** Always filter and minimize input size for expensive string comparison algorithms like  to focus on the specific segments that matter.
-
-## 2025-05-30 - [Targeted Pairwise Comparison via Inverted Index]
 **Learning:** Naive pairwise comparison of $N$ branches is $O(N^2)$, which is devastating for performance in large repositories. Using an inverted index (mapping files to branches that modified them) reduces the search space to only those pairs that actually share modified files.
 **Action:** When performing exhaustive pairwise checks on objects with shared attributes, always build an inverted index first to isolate relevant pairs.
 
@@ -49,3 +41,7 @@
 ## 2025-06-15 - [Process-Specific Resource Monitoring]
 **Learning:** Using system-wide metrics like `psutil.virtual_memory().used` in a `ResourceManager` causes the application to throttle or trigger garbage collection due to unrelated "noisy neighbor" processes.
 **Action:** Always use process-specific metrics via `psutil.Process()` (e.g., `memory_info().rss` and `cpu_percent(interval=None)`) to ensure optimization logic is grounded in the application's actual resource footprint.
+
+## 2025-06-20 - [Redundant Hashing in Cache Operations]
+**Learning:** When using `@cached_function`, the arguments are hashed to create a cache key, which is then re-hashed by `SmartCache`. On a cache miss, this results in triple hashing (once during key generation, once during `get`, and once during `set`).
+**Action:** Introduce an `is_hash` parameter to cache methods to bypass redundant internal hashing when the key is already hashed. Combine this with single-pass `dict.get()` lookups for maximum efficiency in hot paths like conflict prediction.

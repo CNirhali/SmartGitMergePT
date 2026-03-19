@@ -47,8 +47,12 @@ class ConflictPredictor:
                 commit_hash = "unknown"
 
             # BOLT: Include main_commit hash in cache key to avoid stale results
-            cache_key = f"metadata:{branch}:{commit_hash}:{main_branch}:{main_commit}"
-            cached_data = self.cache.get(cache_key)
+            cache_key_raw = f"metadata:{branch}:{commit_hash}:{main_branch}:{main_commit}"
+            # BOLT: Pre-calculate hash to avoid triple-hashing (get + set + internal _get_cache_key)
+            import hashlib
+            cache_key = hashlib.md5(cache_key_raw.encode()).hexdigest()
+
+            cached_data = self.cache.get(cache_key, is_hash=True)
             if cached_data:
                 return branch, cached_data
 
@@ -69,7 +73,7 @@ class ConflictPredictor:
                 # BOLT: Removed eager 'sorted_lines' calculation to improve O(N) phase
                 'commit': commit_hash
             }
-            self.cache.set(cache_key, data)
+            self.cache.set(cache_key, data, is_hash=True)
             return branch, data
 
         with ThreadPoolExecutor() as executor:
@@ -128,8 +132,12 @@ class ConflictPredictor:
                     semantic_conflict = False
                     if not line_conflicts:
                         # Use commit hashes in cache key for semantic similarity
-                        sim_key = f"sim:{data_a['commit']}:{data_b['commit']}"
-                        cached_sim = self.cache.get(sim_key)
+                        sim_key_raw = f"sim:{data_a['commit']}:{data_b['commit']}"
+                        # BOLT: Pre-calculate hash to avoid triple-hashing
+                        import hashlib
+                        sim_key = hashlib.md5(sim_key_raw.encode()).hexdigest()
+
+                        cached_sim = self.cache.get(sim_key, is_hash=True)
                         if cached_sim is not None:
                             semantic_conflict = cached_sim
                         else:
@@ -142,7 +150,7 @@ class ConflictPredictor:
                                     semantic_conflict = True
                                     break
 
-                            self.cache.set(sim_key, semantic_conflict)
+                            self.cache.set(sim_key, semantic_conflict, is_hash=True)
 
                     if overlap or line_conflicts or semantic_conflict:
                         predictions.append({

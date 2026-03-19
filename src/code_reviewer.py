@@ -1,5 +1,6 @@
 import os
 import json
+import functools
 import subprocess
 import tempfile
 from typing import Dict, List, Tuple, Optional, Any
@@ -512,6 +513,7 @@ Be thorough but practical. Only block commits for critical issues."""
 def with_code_review(repo_path: str = ".", config: Optional[ReviewConfig] = None):
     """Decorator to automatically review code before function execution"""
     def decorator(func):
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Review staged changes before executing function
             reviewer = MistralCodeReviewer(repo_path, config)
