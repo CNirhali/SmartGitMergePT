@@ -4,6 +4,8 @@ from typing import List, Dict, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import difflib
 import collections
+import hashlib
+import functools
 
 class ConflictPredictor:
     def __init__(self, repo_path: str = "."):
@@ -16,6 +18,52 @@ class ConflictPredictor:
             ttl_seconds=600,  # 10 minutes cache
             enable_persistence=True
         ))
+
+    def _fetch_branch_data_task(self, branch: str, main_branch: str, main_commit: str) -> Tuple[str, Dict]:
+        """BOLT: Pre-calculate diffs and metadata for a branch"""
+        try:
+            commit_hash = self.git_utils.repo.commit(branch).hexsha
+        except:
+            commit_hash = "unknown"
+
+        # BOLT: Include main_commit hash in cache key to avoid stale results
+        cache_key_raw = f"metadata:{branch}:{commit_hash}:{main_branch}:{main_commit}"
+        # BOLT: Pre-calculate hash to avoid triple-hashing (get + set + internal _get_cache_key)
+        cache_key = hashlib.md5(cache_key_raw.encode()).hexdigest()
+
+        cached_data = self.cache.get(cache_key, is_hash=True)
+        if cached_data:
+            return branch, cached_data
+
+        if branch == main_branch:
+            diff = ""
+        else:
+            try:
+                # BOLT: Using unified=0 to reduce diff size as context is not needed for overlap check
+                diff = self.git_utils.get_diff_between_branches(main_branch, branch, unified=0)
+            except:
+                diff = ""
+
+        files, lines = self._get_diff_metadata(diff)
+        data = {
+            # BOLT: Removed large 'diff' string to save memory and I/O
+            'files': files,
+            'lines': lines,
+            # BOLT: Removed eager 'sorted_lines' calculation to improve O(N) phase
+            'commit': commit_hash
+        }
+        self.cache.set(cache_key, data, is_hash=True)
+        return branch, data
+
+    def _get_lazy_sorted_lines(self, data: Dict, file: str) -> str:
+        """BOLT: Lazily calculate and memoize sorted lines in branch_data"""
+        if 'sorted_lines' not in data:
+            data['sorted_lines'] = {}
+
+        if file not in data['sorted_lines']:
+            data['sorted_lines'][file] = "\n".join(sorted(data['lines'].get(file, [])))
+
+        return data['sorted_lines'][file]
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
         predictions = []
@@ -40,56 +88,11 @@ class ConflictPredictor:
         # BOLT OPTIMIZATION: Pre-calculate diffs and metadata for each branch in parallel
         # This reduces Git operations from O(N^2) to O(N) where N is number of branches
         # Parallelization handles I/O-bound git process calls efficiently.
-        def _fetch_branch_data(branch):
-            try:
-                commit_hash = self.git_utils.repo.commit(branch).hexsha
-            except:
-                commit_hash = "unknown"
-
-            # BOLT: Include main_commit hash in cache key to avoid stale results
-            cache_key_raw = f"metadata:{branch}:{commit_hash}:{main_branch}:{main_commit}"
-            # BOLT: Pre-calculate hash to avoid triple-hashing (get + set + internal _get_cache_key)
-            import hashlib
-            cache_key = hashlib.md5(cache_key_raw.encode()).hexdigest()
-
-            cached_data = self.cache.get(cache_key, is_hash=True)
-            if cached_data:
-                return branch, cached_data
-
-            if branch == main_branch:
-                diff = ""
-            else:
-                try:
-                    # BOLT: Using unified=0 to reduce diff size as context is not needed for overlap check
-                    diff = self.git_utils.get_diff_between_branches(main_branch, branch, unified=0)
-                except:
-                    diff = ""
-
-            files, lines = self._get_diff_metadata(diff)
-            data = {
-                # BOLT: Removed large 'diff' string to save memory and I/O
-                'files': files,
-                'lines': lines,
-                # BOLT: Removed eager 'sorted_lines' calculation to improve O(N) phase
-                'commit': commit_hash
-            }
-            self.cache.set(cache_key, data, is_hash=True)
-            return branch, data
-
         with ThreadPoolExecutor() as executor:
-            results = list(executor.map(_fetch_branch_data, branches))
+            # BOLT: Using lambda to pass additional context without re-defining function
+            results = list(executor.map(lambda b: self._fetch_branch_data_task(b, main_branch, main_commit), branches))
 
         branch_data = dict(results)
-
-        # BOLT: Updated helper to lazily calculate and memoize sorted lines in branch_data
-        def _get_sorted_lines(data, file):
-            if 'sorted_lines' not in data:
-                data['sorted_lines'] = {}
-
-            if file not in data['sorted_lines']:
-                data['sorted_lines'][file] = "\n".join(sorted(data['lines'].get(file, [])))
-
-            return data['sorted_lines'][file]
 
         # BOLT: Build a file-to-branches index to optimize pairwise comparison
         # This transforms the O(N^2) search into a more efficient targeted check
@@ -134,7 +137,6 @@ class ConflictPredictor:
                         # Use commit hashes in cache key for semantic similarity
                         sim_key_raw = f"sim:{data_a['commit']}:{data_b['commit']}"
                         # BOLT: Pre-calculate hash to avoid triple-hashing
-                        import hashlib
                         sim_key = hashlib.md5(sim_key_raw.encode()).hexdigest()
 
                         cached_sim = self.cache.get(sim_key, is_hash=True)
@@ -144,8 +146,8 @@ class ConflictPredictor:
                             # BOLT: Check similarity file-by-file for early exit and smaller SequenceMatcher inputs
                             # This provides a massive win for large multi-file diffs.
                             for common_f in overlap:
-                                content_a = _get_sorted_lines(data_a, common_f)
-                                content_b = _get_sorted_lines(data_b, common_f)
+                                content_a = self._get_lazy_sorted_lines(data_a, common_f)
+                                content_b = self._get_lazy_sorted_lines(data_b, common_f)
                                 if self._semantic_similarity(content_a, content_b):
                                     semantic_conflict = True
                                     break
@@ -176,7 +178,7 @@ class ConflictPredictor:
             if c0 == '+' or c0 == '-':
                 if current_lines is not None:
                     # BOLT: Optimized header skip check
-                    if line.startswith(c0 * 3):
+                    if line.startswith('+++') or line.startswith('---'):
                         continue
                     # BOLT: Using direct indexing to avoid slice allocation
                     current_lines.add(line[1:])
@@ -208,6 +210,7 @@ class ConflictPredictor:
                 return True
         return False
 
+    @functools.lru_cache(maxsize=1024)
     def _semantic_similarity(self, diff_a: str, diff_b: str) -> bool:
         # BOLT: SequenceMatcher is expensive. Use quick_ratio for early rejection.
         if not diff_a or not diff_b:

@@ -114,7 +114,8 @@ class SmartCache:
         """Get value from cache"""
         try:
             # BOLT: Use internal keying to match preloaded persistent cache
-            cache_key = self._get_cache_key(key, is_hash)
+            # Skip expensive hashing if key is already a hash
+            cache_key = key if is_hash else self._get_cache_key(key)
 
             # Try memory cache first
             # BOLT: Use dict.get() for single-pass lookup optimization
@@ -145,7 +146,8 @@ class SmartCache:
         """Set value in cache"""
         try:
             # BOLT: Use internal keying
-            cache_key = self._get_cache_key(key, is_hash)
+            # Skip expensive hashing if key is already a hash
+            cache_key = key if is_hash else self._get_cache_key(key)
 
             # Compress if enabled
             if self.config.enable_compression:
@@ -168,7 +170,8 @@ class SmartCache:
         """Delete value from cache"""
         try:
             # BOLT: Use internal keying
-            cache_key = self._get_cache_key(key, is_hash)
+            # Skip expensive hashing if key is already a hash
+            cache_key = key if is_hash else self._get_cache_key(key)
 
             if cache_key in self.cache:
                 del self.cache[cache_key]
