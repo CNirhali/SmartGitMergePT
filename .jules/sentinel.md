@@ -82,3 +82,8 @@
 **Vulnerability:** `InputValidator._sanitize_html` and `validate_url` could be bypassed using whitespace or newlines within dangerous protocols (e.g., `j\navascript:`) or before the colon (e.g., `javascript :`).
 **Learning:** Browser parsers are extremely lenient and often strip whitespace within URI schemes. Simple substring matching or literal regexes are insufficient for protocol filtering.
 **Prevention:** Use regular expressions that account for optional whitespace (`\s*`) between every character of the protocol name and before the colon separator. Always use pre-compiled regexes for both the fast-path check and the actual sanitization to ensure consistency.
+
+## 2026-03-19 - [Resource Bounding and Robust URL Validation]
+**Vulnerability:** Memory exhaustion DoS in SecurityMonitor and protocol bypass in validate_url.
+**Learning:** Security monitoring components must bound their state to prevent resource exhaustion attacks. URL validation requires stripping whitespace and using robust regex to detect obfuscated protocols that bypass standard parsers.
+**Prevention:** Use bounded collections (deque, OrderedDict with capacity) for tracking untrusted identifiers. Normalize and regex-validate inputs before protocol-specific parsing.
