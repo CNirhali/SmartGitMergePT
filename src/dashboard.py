@@ -41,9 +41,13 @@ template = '''
         code { background: #afb8c133; padding: 0.2em 0.4em; border-radius: 6px; font-size: 85%; transition: background-color 0.2s, color 0.2s; }
         .timestamp { color: #57606a; font-size: 0.9em; margin-bottom: 1em; }
         .empty-state { padding: 20px; text-align: center; background: #f6f8fa; border: 1px dashed #d0d7de; border-radius: 6px; color: #57606a; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 600; border: 1px solid transparent; }
         .badge-success { background: #dafbe1; color: #1a7f37; }
         .badge-error { background: #ffebe9; color: #cf222e; }
+        .interactive-badge { cursor: pointer; user-select: none; transition: all 0.2s; }
+        .interactive-badge:hover { background: #ffebe9; border-color: #cf222e; }
+        .interactive-badge:active { transform: translateY(1px); }
+        .interactive-badge.active-filter { background: #cf222e; color: white; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #cf222e; }
         .branch-tag { background: #ddf4ff; color: #0969da; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.85em; text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
         .branch-tag:hover { background: #cfeeff; border-color: #0969da; }
         .branch-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
@@ -223,14 +227,14 @@ template = '''
                 </td>
                 <td>
                     {% if pred['line_conflicts'] %}
-                        <span class="badge badge-error" aria-label="Line overlap detected"><span class="sr-only">Line Overlap</span>⚠️ Yes</span>
+                        <span class="badge badge-error interactive-badge" role="button" tabindex="0" aria-pressed="false" aria-label="Filter by Line Overlap: Line overlap detected" title="Click to filter" data-filter="Line Overlap" data-scenario="line_overlap"><span class="sr-only">Line Overlap</span>⚠️ Yes</span>
                     {% else %}
                         <span class="absent" aria-label="No line overlap detected">—</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if pred['semantic_conflict'] %}
-                        <span class="badge badge-error" aria-label="Semantic conflict detected"><span class="sr-only">Semantic Conflict</span>⚠️ Yes</span>
+                        <span class="badge badge-error interactive-badge" role="button" tabindex="0" aria-pressed="false" aria-label="Filter by Semantic Conflict: Semantic conflict detected" title="Click to filter" data-filter="Semantic Conflict" data-scenario="semantic_conflict"><span class="sr-only">Semantic Conflict</span>⚠️ Yes</span>
                     {% else %}
                         <span class="absent" aria-label="No semantic conflict detected">—</span>
                     {% endif %}
@@ -244,6 +248,8 @@ template = '''
     {% endif %}
 
     <script nonce="{{ nonce }}">
+        const filterInput = document.getElementById('filter-input');
+        const clearFilterBtn = document.getElementById('clear-filter');
         const refreshBtn = document.querySelector('.refresh-btn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', refresh);
@@ -252,6 +258,18 @@ template = '''
             refreshBtn.textContent = 'Refreshing...';
             refreshBtn.disabled = true;
             window.location.reload();
+        }
+
+        function applyGlobalFilter(filterValue) {
+            // PALETTE: Toggle filter off if already active
+            filterInput.value = filterInput.value.toLowerCase() === filterValue.toLowerCase() ? '' : filterValue;
+            filterInput.dispatchEvent(new Event('input'));
+            filterInput.focus();
+            // Smooth scroll to table if not in view
+            const table = document.querySelector('table');
+            if (table && window.getComputedStyle(table).display !== 'none' && filterInput.value !== '') {
+                table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         function copyToClipboard(element, attr = 'data-branch') {
@@ -318,7 +336,7 @@ template = '''
         }
 
         function toggleScenarioHighlight(scenario, active) {
-            document.querySelectorAll(`.scenario-types li[data-scenario="${scenario}"]`).forEach(item => {
+            document.querySelectorAll(`.scenario-types li[data-scenario="${scenario}"], .interactive-badge[data-scenario="${scenario}"]`).forEach(item => {
                 item.classList.toggle('highlight-secondary', active);
             });
             document.querySelectorAll(`tr[data-scenarios]`).forEach(row => {
@@ -335,29 +353,21 @@ template = '''
             });
         }
 
-        document.querySelectorAll('.scenario-types li').forEach(item => {
-            const applyFilter = () => {
-                const filterValue = item.getAttribute('data-filter');
-                // PALETTE: Toggle filter off if already active
-                filterInput.value = filterInput.value.toLowerCase() === filterValue.toLowerCase() ? '' : filterValue;
-                filterInput.dispatchEvent(new Event('input'));
-                filterInput.focus();
-                // Smooth scroll to table if not in view
-                const table = document.querySelector('table');
-                if (table && window.getComputedStyle(table).display !== 'none' && filterInput.value !== '') {
-                    table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            };
+        document.querySelectorAll('.scenario-types li, .interactive-badge').forEach(item => {
             const scenario = item.getAttribute('data-scenario');
             item.addEventListener('mouseenter', () => toggleScenarioHighlight(scenario, true));
             item.addEventListener('mouseleave', () => toggleScenarioHighlight(scenario, false));
             item.addEventListener('focusin', () => toggleScenarioHighlight(scenario, true));
             item.addEventListener('focusout', () => toggleScenarioHighlight(scenario, false));
-            item.addEventListener('click', applyFilter);
+            item.addEventListener('click', (e) => {
+                e.stopPropagation(); // Avoid triggering row hover or other click handlers
+                applyGlobalFilter(item.getAttribute('data-filter'));
+            });
             item.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    applyFilter();
+                    e.stopPropagation();
+                    applyGlobalFilter(item.getAttribute('data-filter'));
                 }
             });
         });
@@ -369,14 +379,7 @@ template = '''
                 copyToClipboard(tag, attr);
                 // PALETTE: Universal filtering for ALL branch tags
                 if (!isFile) {
-                    const branchName = tag.getAttribute('data-branch');
-                    // PALETTE: Toggle filter off if already active
-                    filterInput.value = filterInput.value.toLowerCase() === branchName.toLowerCase() ? '' : branchName;
-                    filterInput.dispatchEvent(new Event('input'));
-                    const table = document.querySelector('table');
-                    if (table && window.getComputedStyle(table).display !== 'none' && filterInput.value !== '') {
-                        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
+                    applyGlobalFilter(tag.getAttribute('data-branch'));
                 }
             });
 
@@ -400,8 +403,6 @@ template = '''
             });
         });
 
-        const filterInput = document.getElementById('filter-input');
-        const clearFilterBtn = document.getElementById('clear-filter');
         const resultsCount = document.getElementById('filter-results-count');
         const monitoredBranchTags = document.querySelectorAll('#monitored-branches-list .branch-tag');
         const tableRows = document.querySelectorAll('tbody tr');
@@ -466,12 +467,12 @@ template = '''
                 tag.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
 
-            document.querySelectorAll('.scenario-types li').forEach(li => {
-                const text = li.getAttribute('data-filter').toLowerCase();
+            document.querySelectorAll('.scenario-types li, .interactive-badge').forEach(el => {
+                const text = el.getAttribute('data-filter').toLowerCase();
                 const isActive = query !== '' && text === query;
-                li.classList.toggle('active-filter', isActive);
+                el.classList.toggle('active-filter', isActive);
                 // PALETTE: Sync ARIA state
-                li.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             });
 
             tableRows.forEach(row => {

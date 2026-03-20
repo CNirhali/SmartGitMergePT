@@ -25,3 +25,7 @@
 ## 2026-03-15 - [Bidirectional Data Highlighting]
 **Learning:** Linking summary metrics to specific data rows via bidirectional highlighting (Scenario Types <-> Table Rows) provides immediate visual validation of the summary data and helps users quickly navigate large datasets. This pattern turns a static summary into an interactive "map" of the data.
 **Action:** Implement `data-scenario` and `data-scenarios` attributes to link category items to data rows, and use JavaScript to toggle highlighting on both when either is hovered or focused.
+
+## 2026-03-20 - [Universal Interactive Filtering]
+**Learning:** Transforming static status badges in a data table into interactive filter triggers creates a powerful "drill-down" experience. Users intuitively expect that clicking a highlighted status (like a "Conflict" badge) will filter the view to similar items.
+**Action:** Implement a centralized `applyGlobalFilter` function to handle toggling, event dispatching, and scroll management for all interactive filterable elements (branch tags, scenario types, and status badges).
