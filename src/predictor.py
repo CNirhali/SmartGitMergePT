@@ -170,6 +170,7 @@ class ConflictPredictor:
         lines_by_file = {}
         current_lines = None
 
+        # BOLT: Using splitlines() for robustness with universal newlines (LF, CRLF)
         for line in diff.splitlines():
             if not line:
                 continue
@@ -177,10 +178,12 @@ class ConflictPredictor:
             c0 = line[0]
             if c0 == '+' or c0 == '-':
                 if current_lines is not None:
-                    # BOLT: Optimized header skip check
-                    if line.startswith('+++') or line.startswith('---'):
+                    # BOLT: Optimized header skip check: check 2nd and 3rd chars
+                    # Using indexing is faster than startswith('+++')/startswith('---')
+                    # because it avoids a method call and argument string creation.
+                    if len(line) >= 3 and line[1] == c0 and line[2] == c0:
                         continue
-                    # BOLT: Using direct indexing to avoid slice allocation
+                    # BOLT: Slicing line[1:] creates a new string but is necessary to extract content.
                     current_lines.add(line[1:])
             elif c0 == 'd':  # diff --git ...
                 if line.startswith('diff --git'):
@@ -230,7 +233,11 @@ class ConflictPredictor:
 
         seq = difflib.SequenceMatcher(None, diff_a, diff_b)
 
-        # Fast early rejection
+        # BOLT: Fast early rejection using a hierarchy of checks
+        # real_quick_ratio() is the fastest, then quick_ratio(), then ratio()
+        if seq.real_quick_ratio() < 0.7:
+            return False
+
         if seq.quick_ratio() < 0.7:
             return False
 

@@ -53,3 +53,7 @@
 ## 2025-06-25 - [Static vs Dynamic String Checks in Hot Loops]
 **Learning:** Dynamic string multiplication (e.g., 'c0 * 3') and slicing in a hot loop (like diff parsing) can be measurably slower than static prefix checks. Replacing dynamic header detection with explicit 'startswith' for '+++' and '---' reduces overhead in O(L) diff processing where L is total lines across all branch diffs.
 **Action:** Prefer static constant comparisons over dynamic string construction in performance-critical parsing loops.
+
+## 2025-07-05 - [Hierarchical Fail-Fast for Diff Similarity and Header Detection]
+**Learning:** In high-frequency diff parsing and similarity checking, `real_quick_ratio()` is an essential first-stage filter for `difflib.SequenceMatcher`. Additionally, manual indexing (`line[1] == c0`) is measurably faster than `startswith` in Python loops as it avoids method dispatch and argument string overhead.
+**Action:** Use `real_quick_ratio()` as the first stage of any `SequenceMatcher` hierarchy. Replace `startswith` with indexing in hot loops where the match pattern is a single character repetition (like diff headers).

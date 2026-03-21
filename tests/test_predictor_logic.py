@@ -1,0 +1,38 @@
+import pytest
+from predictor import ConflictPredictor
+
+def test_get_diff_metadata_basic():
+    predictor = ConflictPredictor()
+    diff = """diff --git a/file1.txt b/file1.txt
+index 1234567..89abcde 100644
+--- a/file1.txt
++++ b/file1.txt
+@@ -1,1 +1,1 @@
+-old line
++new line
+diff --git a/file2.txt b/file2.txt
+--- a/file2.txt
++++ b/file2.txt
+-removed line
++added line"""
+    files, lines = predictor._get_diff_metadata(diff)
+    assert "file1.txt" in files
+    assert "file2.txt" in files
+    assert "new line" in lines["file1.txt"]
+    assert "old line" in lines["file1.txt"]
+    assert "added line" in lines["file2.txt"]
+    assert "removed line" in lines["file2.txt"]
+    assert "--- a/file1.txt" not in lines["file1.txt"]
+    assert "+++ b/file1.txt" not in lines["file1.txt"]
+
+def test_semantic_similarity_basic():
+    predictor = ConflictPredictor()
+    s1 = "import os\nimport sys\ndef hello():\n    print('hello world')\n"
+    s2 = "import os\nimport sys\ndef hello():\n    print('hello world')\n"
+    assert predictor._semantic_similarity(s1, s2) is True
+
+    s3 = "def goodbye():\n    pass"
+    assert predictor._semantic_similarity(s1, s3) is False
+
+    s4 = "import os\nimport sys\ndef hello_world():\n    print('hello world!')\n"
+    assert predictor._semantic_similarity(s1, s4) is True
