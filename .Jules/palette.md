@@ -29,3 +29,7 @@
 ## 2026-03-20 - [Universal Interactive Filtering]
 **Learning:** Transforming static status badges in a data table into interactive filter triggers creates a powerful "drill-down" experience. Users intuitively expect that clicking a highlighted status (like a "Conflict" badge) will filter the view to similar items.
 **Action:** Implement a centralized `applyGlobalFilter` function to handle toggling, event dispatching, and scroll management for all interactive filterable elements (branch tags, scenario types, and status badges).
+
+## 2026-03-21 - [Empty State Recovery Path]
+**Learning:** For data-heavy dashboards, "No Results" states should not just show static text; they must provide an immediate recovery path (like a "Clear filter" button) to prevent user frustration. Additionally, empty state detection must account for all relevant filtered lists (e.g., both a primary table and a secondary list) to avoid showing "No results" prematurely when some items are still visible.
+**Action:** Always include a contextual "Clear/Reset" button in empty states and implement comprehensive visibility checks that encompass all filtered UI regions before rendering the "No results" feedback.
