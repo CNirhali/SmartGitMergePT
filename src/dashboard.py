@@ -117,6 +117,7 @@ template = '''
             box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
         }
         .no-results { display: none; text-align: center; padding: 20px; color: #57606a; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; margin-top: 1em; }
+        .no-results button { margin-left: 8px; margin-bottom: 0; }
         .filter-container { display: flex; align-items: center; gap: 8px; }
         #clear-filter {
             margin-bottom: 0;
@@ -399,6 +400,10 @@ template = '''
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     copyToClipboard(tag, attr);
+                    // PALETTE: Universal filtering for ALL branch tags via keyboard
+                    if (!isFile) {
+                        applyGlobalFilter(tag.getAttribute('data-branch'));
+                    }
                 }
             });
         });
@@ -408,11 +413,22 @@ template = '''
         const tableRows = document.querySelectorAll('tbody tr');
         const noResults = document.createElement('div');
         noResults.className = 'no-results';
-        noResults.textContent = 'No matching branches or conflicts found.';
+        noResults.innerHTML = 'No matching branches or conflicts found. <button class="refresh-btn">Clear filter</button>';
+        noResults.querySelector('button').addEventListener('click', () => {
+            filterInput.value = '';
+            filterInput.dispatchEvent(new Event('input'));
+            filterInput.focus();
+        });
 
         const table = document.querySelector('table');
         if (table) {
             table.parentNode.insertBefore(noResults, table.nextSibling);
+        } else {
+            // PALETTE: If no table (no conflicts at all), append after the monitored list
+            const monitoredList = document.getElementById('monitored-branches-list');
+            if (monitoredList) {
+                monitoredList.parentNode.insertBefore(noResults, monitoredList.nextSibling);
+            }
         }
 
         function updatePageTitle(count) {
@@ -490,8 +506,13 @@ template = '''
 
             if (table) {
                 table.style.display = visibleRowsCount > 0 ? '' : 'none';
-                noResults.style.display = (visibleRowsCount === 0 && query !== '') ? 'block' : 'none';
             }
+            // PALETTE: Check monitored branches list as well for "No results"
+            let anyMonitoredVisible = false;
+            document.querySelectorAll('#monitored-branches-list .branch-tag').forEach(tag => {
+                if (tag.style.display !== 'none') anyMonitoredVisible = true;
+            });
+            noResults.style.display = ((visibleRowsCount === 0 && !anyMonitoredVisible) && query !== '') ? 'block' : 'none';
             updatePageTitle(visibleRowsCount);
         });
 
