@@ -71,6 +71,21 @@ template = '''
         }
         .branch-tag.base-branch { border-style: dashed; border-color: #57606a; }
         .branch-tag.base-branch small { color: #57606a; font-weight: normal; margin-left: 2px; }
+        .copy-diff-btn {
+            display: none;
+            margin-left: 8px;
+            padding: 2px 6px;
+            font-size: 11px;
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #57606a;
+            vertical-align: middle;
+            transition: all 0.2s;
+        }
+        .copy-diff-btn:hover { background: #ebecf0; color: #24292f; border-color: #afb8c1; }
+        tr:hover .copy-diff-btn, tr:focus-within .copy-diff-btn { display: inline-block; }
         .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
         .file-tag:hover { background: #afb8c166; }
         .file-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
@@ -212,9 +227,14 @@ template = '''
             {% set is_base_b = pred['branches'][1] == main_branch %}
             <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}" data-scenarios="{{ 'file_overlap' if pred.get('files') }} {{ 'line_overlap' if pred.get('line_conflicts') }} {{ 'semantic_conflict' if pred.get('semantic_conflict') }}">
                 <td>
-                    <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Filter and copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
-                    <span class="branch-sep" aria-hidden="true">↔</span>
-                    <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Filter and copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
+                            <span class="branch-sep" aria-hidden="true">↔</span>
+                            <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
+                        </div>
+                        <button class="copy-diff-btn" aria-label="Copy git diff command" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0] }}..{{ pred['branches'][1] }}">diff</button>
+                    </div>
                 </td>
                 <td>
                     {% if pred['files'] %}
@@ -373,10 +393,18 @@ template = '''
             });
         });
 
+        document.querySelectorAll('.copy-diff-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                copyToClipboard(btn, 'data-diff');
+            });
+        });
+
         document.querySelectorAll('.branch-tag, .file-tag').forEach(tag => {
             const isFile = tag.classList.contains('file-tag');
             const attr = isFile ? 'data-copy' : 'data-branch';
-            tag.addEventListener('click', () => {
+            tag.addEventListener('click', (e) => {
+                e.stopPropagation();
                 copyToClipboard(tag, attr);
                 // PALETTE: Universal filtering for ALL branch tags
                 if (!isFile) {
@@ -413,7 +441,7 @@ template = '''
         const tableRows = document.querySelectorAll('tbody tr');
         const noResults = document.createElement('div');
         noResults.className = 'no-results';
-        noResults.innerHTML = 'No matching branches or conflicts found. <button class="refresh-btn">Clear filter</button>';
+        noResults.innerHTML = 'No matching branches or conflicts found. <button class="refresh-btn" aria-label="Clear filter (Press \'Esc\')">Clear filter <kbd>Esc</kbd></button>';
         noResults.querySelector('button').addEventListener('click', () => {
             filterInput.value = '';
             filterInput.dispatchEvent(new Event('input'));
