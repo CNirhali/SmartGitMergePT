@@ -146,11 +146,13 @@ class InputValidator:
 
         # BOLT: Pre-compile HTML patterns
         # 🛡️ Sentinel: Use innermost matching for tags to support recursive sanitization
-        self._html_tag_re = re.compile(r'<[^<>]*>')
+        self._html_tag_re = re.compile(r'<[^<>]*+>')
         self._script_tag_re = re.compile(r'<script[^<>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
         # 🛡️ Sentinel: Support optional whitespace within/after dangerous protocols to prevent bypasses (e.g. j a v a s c r i p t : )
+        # BOLT: Using a combination of character sets and atomic groups (emulated via lookahead) if supported,
+        # but standard possessive quantifiers (\s*+) are available in Python 3.11+.
         self._dangerous_protocol_re = re.compile(
-            r'(j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t|v\s*b\s*s\s*c\s*r\s*i\s*p\s*t|d\s*a\s*t\s*a)\s*:',
+            r'(j\s*+a\s*+v\s*+a\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|v\s*+b\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|d\s*+a\s*+t\s*+a)\s*+:',
             re.IGNORECASE
         )
     
@@ -278,6 +280,15 @@ class InputValidator:
             if ':' not in text:
                 return html.escape(text)
 
+            # BOLT: Faster O(N) check for potential dangerous protocol start characters
+            # Only hit regex if text contains 'j', 'v', or 'd' (ignoring case)
+            # This avoids expensive regex engine overhead for most strings with colons.
+            # 🛡️ Sentinel: We must still proceed to regex if we want to strip tags later,
+            # but since we are inside `if '<' not in text:`, we know there are no tags.
+            text_to_check = text.lower()
+            if 'j' not in text_to_check and 'v' not in text_to_check and 'd' not in text_to_check:
+                return html.escape(text)
+
             # 🛡️ Sentinel: Use the pre-compiled regex for fast-path check as well
             if not self._dangerous_protocol_re.search(text):
                 # If no tags and no dangerous protocols, we only need html.escape for safety
@@ -298,9 +309,10 @@ class InputValidator:
             if text == original_text:
                 break
 
-        # Escape HTML characters last for robustness
-        text = html.escape(text)
-        return text
+        # BOLT: Check if any potentially dangerous characters remain that need escaping
+        # If the string was already sanitized or is safe, html.escape might be redundant
+        # but is kept for defense-in-depth as per security guidelines.
+        return html.escape(text)
 
 def ensure_private_file(path: Union[str, Path]):
     """Ensure a file exists and has restrictive (0o600) permissions"""
