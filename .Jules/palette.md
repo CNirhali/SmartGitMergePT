@@ -33,3 +33,7 @@
 ## 2026-03-21 - [Empty State Recovery Path]
 **Learning:** For data-heavy dashboards, "No Results" states should not just show static text; they must provide an immediate recovery path (like a "Clear filter" button) to prevent user frustration. Additionally, empty state detection must account for all relevant filtered lists (e.g., both a primary table and a secondary list) to avoid showing "No results" prematurely when some items are still visible.
 **Action:** Always include a contextual "Clear/Reset" button in empty states and implement comprehensive visibility checks that encompass all filtered UI regions before rendering the "No results" feedback.
+
+## 2026-03-22 - [Actionable Row-Level Commands]
+**Learning:** In data-heavy tables, exposing common terminal-based actions (like `git diff`) as one-click "Copy" buttons that appear only on row hover/focus significantly improves developer productivity without cluttering the primary UI. Using `:focus-within` ensures these actions remain discoverable and usable for keyboard/screen reader users.
+**Action:** Implement hover-triggered "action strips" or buttons for row-specific tasks and ensure accessibility via `:focus-within` and clear ARIA labels.
