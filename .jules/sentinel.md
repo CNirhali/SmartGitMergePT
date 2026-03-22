@@ -87,3 +87,8 @@
 **Vulnerability:** Memory exhaustion DoS in SecurityMonitor and protocol bypass in validate_url.
 **Learning:** Security monitoring components must bound their state to prevent resource exhaustion attacks. URL validation requires stripping whitespace and using robust regex to detect obfuscated protocols that bypass standard parsers.
 **Prevention:** Use bounded collections (deque, OrderedDict with capacity) for tracking untrusted identifiers. Normalize and regex-validate inputs before protocol-specific parsing.
+
+## 2026-03-22 - [SSRF Bypass via Hostname Obfuscation]
+**Vulnerability:** URL validation could be bypassed using percent-encoded hostnames (e.g., `%31%32%37%2e%30%2e%30%2e%31`) and trailing dots (e.g., `127.0.0.1.`).
+**Learning:** Simple string matching and even basic `urlparse` are insufficient for SSRF protection as they don't account for various ways hostnames can be represented but still resolved by underlying libraries.
+**Prevention:** Normalize hostnames by unquoting and stripping trailing dots *before* passing them to IP validation functions like `ipaddress.ip_address` or `socket.inet_aton`.

@@ -240,7 +240,8 @@ class InputValidator:
             # Handle IP-based hostnames for robust SSRF protection
             try:
                 # Remove brackets from IPv6 literal if present
-                ip_str = hostname.strip('[]')
+                # 🛡️ Sentinel: Use normalized_hostname for IP checks to prevent bypasses
+                ip_str = normalized_hostname.strip('[]')
                 ip = ipaddress.ip_address(ip_str)
                 if self._is_internal_ip(ip):
                     return False, f"Internal IP not allowed: {ip}"
@@ -248,7 +249,8 @@ class InputValidator:
             except ValueError:
                 # Hostname is not a valid IP address, check for shorthand IP notation (e.g. 127.1)
                 try:
-                    packed_ip = socket.inet_aton(hostname)
+                    # 🛡️ Sentinel: Use normalized_hostname for shorthand IP checks
+                    packed_ip = socket.inet_aton(normalized_hostname)
                     ip_str = socket.inet_ntoa(packed_ip)
                     ip = ipaddress.ip_address(ip_str)
                     if self._is_internal_ip(ip):
