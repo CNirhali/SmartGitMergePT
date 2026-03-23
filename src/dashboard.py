@@ -69,7 +69,7 @@ template = '''
             text-align: center;
             font-weight: bold;
         }
-        .branch-tag.base-branch { border-style: dashed; border-color: #57606a; }
+        .branch-tag.base-branch { border-style: dashed; border-color: #57606a; background-color: #f6f8fa; color: #24292f; }
         .branch-tag.base-branch small { color: #57606a; font-weight: normal; margin-left: 2px; }
         .copy-diff-btn {
             display: none;
@@ -233,7 +233,7 @@ template = '''
                             <span class="branch-sep" aria-hidden="true">↔</span>
                             <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                         </div>
-                        <button class="copy-diff-btn" aria-label="Copy git diff command" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0] }}..{{ pred['branches'][1] }}">diff</button>
+                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0] }}..{{ pred['branches'][1] }}">diff</button>
                     </div>
                 </td>
                 <td>
@@ -248,14 +248,14 @@ template = '''
                 </td>
                 <td>
                     {% if pred['line_conflicts'] %}
-                        <span class="badge badge-error interactive-badge" role="button" tabindex="0" aria-pressed="false" aria-label="Filter by Line Overlap: Line overlap detected" title="Click to filter" data-filter="Line Overlap" data-scenario="line_overlap"><span class="sr-only">Line Overlap</span>⚠️ Yes</span>
+                        <span class="badge badge-error interactive-badge" role="button" tabindex="0" aria-pressed="false" aria-label="Filter by Line Overlap: Line overlap detected" title="Line Overlap: Both branches change the same or similar lines. Click to filter." data-filter="Line Overlap" data-scenario="line_overlap"><span class="sr-only">Line Overlap</span>⚠️ Yes</span>
                     {% else %}
                         <span class="absent" aria-label="No line overlap detected">—</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if pred['semantic_conflict'] %}
-                        <span class="badge badge-error interactive-badge" role="button" tabindex="0" aria-pressed="false" aria-label="Filter by Semantic Conflict: Semantic conflict detected" title="Click to filter" data-filter="Semantic Conflict" data-scenario="semantic_conflict"><span class="sr-only">Semantic Conflict</span>⚠️ Yes</span>
+                        <span class="badge badge-error interactive-badge" role="button" tabindex="0" aria-pressed="false" aria-label="Filter by Semantic Conflict: Semantic conflict detected" title="Semantic Conflict: Changes are different but may cause logical or functional conflicts. Click to filter." data-filter="Semantic Conflict" data-scenario="semantic_conflict"><span class="sr-only">Semantic Conflict</span>⚠️ Yes</span>
                     {% else %}
                         <span class="absent" aria-label="No semantic conflict detected">—</span>
                     {% endif %}
@@ -293,7 +293,7 @@ template = '''
             }
         }
 
-        function copyToClipboard(element, attr = 'data-branch') {
+        function copyToClipboard(element, attr = 'data-branch', successElement = null) {
             const text = element.getAttribute(attr);
             if (element.querySelector('.copy-tooltip')) return;
             navigator.clipboard.writeText(text).then(() => {
@@ -302,7 +302,8 @@ template = '''
                 tooltip.textContent = 'Copied!';
                 element.appendChild(tooltip);
 
-                element.classList.add('copy-success');
+                const el = successElement || element;
+                el.classList.add('copy-success');
                 const announcer = document.getElementById('announcer');
                 if (announcer) {
                     announcer.textContent = `Copied ${text} to clipboard`;
@@ -311,6 +312,7 @@ template = '''
                 setTimeout(() => {
                     tooltip.remove();
                     element.classList.remove('copy-success');
+                    if (successElement) successElement.classList.remove('copy-success');
                     if (announcer) announcer.textContent = '';
                 }, 1000);
             });
@@ -396,7 +398,7 @@ template = '''
         document.querySelectorAll('.copy-diff-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                copyToClipboard(btn, 'data-diff');
+                copyToClipboard(btn, 'data-diff', btn.closest('tr'));
             });
         });
 
