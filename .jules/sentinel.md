@@ -1,3 +1,5 @@
+# Sentinel's Security Journal
+
 ## 2026-02-27 - [Path Traversal in Code Reviewer]
 **Vulnerability:** Path traversal vulnerability in `MistralCodeReviewer._review_file` allowed reading arbitrary files outside the repository root.
 **Learning:** Using `os.path.join(self.repo_path, file_path)` is insufficient to prevent path traversal if `file_path` contains `..` segments.
@@ -92,3 +94,8 @@
 **Vulnerability:** URL validation could be bypassed using percent-encoded hostnames (e.g., `%31%32%37%2e%30%2e%30%2e%31`) and trailing dots (e.g., `127.0.0.1.`).
 **Learning:** Simple string matching and even basic `urlparse` are insufficient for SSRF protection as they don't account for various ways hostnames can be represented but still resolved by underlying libraries.
 **Prevention:** Normalize hostnames by unquoting and stripping trailing dots *before* passing them to IP validation functions like `ipaddress.ip_address` or `socket.inet_aton`.
+
+## 2026-03-23 - [SSRF Bypass via IPv4-Mapped IPv6 and Integer Notation]
+**Vulnerability:** SSRF protection in `_is_internal_ip` could be bypassed using IPv4-mapped IPv6 addresses (e.g., `::ffff:127.0.0.1`) which `ipaddress.IPv6Address.is_loopback` does not always catch depending on the parser. Additionally, integer-based IP representations (decimal, hex, octal) were not explicitly blocked.
+**Learning:** Comprehensive SSRF protection requires normalizing all IP representations (including mapped addresses and alternative notations) to their canonical form before applying range checks.
+**Prevention:** Explicitly extract and validate the mapped IPv4 address from IPv4-mapped IPv6 objects. Implement explicit parsing of integer-based hostnames as IPv4 addresses to ensure they are subjected to internal range validation.

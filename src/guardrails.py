@@ -151,8 +151,11 @@ class InputValidator:
         # 🛡️ Sentinel: Support optional whitespace within/after dangerous protocols to prevent bypasses (e.g. j a v a s c r i p t : )
         # BOLT: Using a combination of character sets and atomic groups (emulated via lookahead) if supported,
         # but standard possessive quantifiers (\s*+) are available in Python 3.11+.
+        # Expanded with file, gopher, php, jar, dict, and ldap to prevent SSRF and other URI-based attacks.
         self._dangerous_protocol_re = re.compile(
-            r'(j\s*+a\s*+v\s*+a\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|v\s*+b\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|d\s*+a\s*+t\s*+a)\s*+:',
+            r'(j\s*+a\s*+v\s*+a\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|v\s*+b\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|d\s*+a\s*+t\s*+a|'
+            r'f\s*+i\s*+l\s*+e|g\s*+o\s*+p\s*+h\s*+e\s*+r|p\s*+h\s*+p|j\s*+a\s*+r|'
+            r'd\s*+i\s*+c\s*+t|l\s*+d\s*+a\s*+p)\s*+:',
             re.IGNORECASE
         )
     
@@ -222,7 +225,7 @@ class InputValidator:
             parsed = urlparse(url)
             
             # Check for dangerous protocols via parsed scheme as a second layer
-            dangerous_protocols = {'file', 'javascript', 'data', 'vbscript', 'gopher', 'dict', 'ldap', 'ftp', 'tftp'}
+            dangerous_protocols = {'file', 'javascript', 'data', 'vbscript', 'gopher', 'dict', 'ldap', 'ftp', 'tftp', 'php', 'jar'}
             if parsed.scheme.lower() in dangerous_protocols:
                 return False, f"Dangerous URL protocol detected: {parsed.scheme}"
 
@@ -247,6 +250,18 @@ class InputValidator:
                     return False, f"Internal IP not allowed: {ip}"
 
             except ValueError:
+                # 🛡️ Sentinel: Check for integer-based IPv4 (decimal, hex, octal) for robust SSRF protection
+                try:
+                    # If it looks like a number (including 0x prefix), try parsing as integer
+                    if normalized_hostname.isdigit() or normalized_hostname.startswith('0x'):
+                        ip_int = int(normalized_hostname, 0)
+                        if 0 <= ip_int <= 0xFFFFFFFF:
+                            ip = ipaddress.IPv4Address(ip_int)
+                            if self._is_internal_ip(ip):
+                                return False, f"Internal IP (integer) not allowed: {ip}"
+                except (ValueError, OverflowError):
+                    pass
+
                 # Hostname is not a valid IP address, check for shorthand IP notation (e.g. 127.1)
                 try:
                     # 🛡️ Sentinel: Use normalized_hostname for shorthand IP checks
@@ -264,7 +279,11 @@ class InputValidator:
             return False, f"URL validation error: {str(e)}"
 
     def _is_internal_ip(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
-        """Check if an IP address belongs to an internal or reserved range"""
+        """Check if an IP address belongs to an internal or reserved range, including IPv4-mapped IPv6"""
+        # 🛡️ Sentinel: Check for IPv4-mapped IPv6 address (e.g., ::ffff:127.0.0.1)
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            return self._is_internal_ip(ip.ipv4_mapped)
+
         return (
             ip.is_loopback or
             ip.is_private or
@@ -283,12 +302,15 @@ class InputValidator:
                 return html.escape(text)
 
             # BOLT: Faster O(N) check for potential dangerous protocol start characters
-            # Only hit regex if text contains 'j', 'v', or 'd' (ignoring case)
+            # Only hit regex if text contains characters from dangerous protocols (ignoring case)
+            # Expanded set: j, v, d, f, g, p, l (from javascript, vbscript, data, file, gopher, php, jar, dict, ldap)
             # This avoids expensive regex engine overhead for most strings with colons.
             # 🛡️ Sentinel: We must still proceed to regex if we want to strip tags later,
             # but since we are inside `if '<' not in text:`, we know there are no tags.
             text_to_check = text.lower()
-            if 'j' not in text_to_check and 'v' not in text_to_check and 'd' not in text_to_check:
+            # 🛡️ Sentinel: Removed 'h' to avoid triggering on all 'http' URLs while maintaining security
+            dangerous_chars = {'j', 'v', 'd', 'f', 'g', 'p', 'l'}
+            if not any(c in text_to_check for c in dangerous_chars):
                 return html.escape(text)
 
             # 🛡️ Sentinel: Use the pre-compiled regex for fast-path check as well
