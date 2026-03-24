@@ -57,3 +57,7 @@
 ## 2025-07-05 - [Hierarchical Fail-Fast for Diff Similarity and Header Detection]
 **Learning:** In high-frequency diff parsing and similarity checking, `real_quick_ratio()` is an essential first-stage filter for `difflib.SequenceMatcher`. Additionally, manual indexing (`line[1] == c0`) is measurably faster than `startswith` in Python loops as it avoids method dispatch and argument string overhead.
 **Action:** Use `real_quick_ratio()` as the first stage of any `SequenceMatcher` hierarchy. Replace `startswith` with indexing in hot loops where the match pattern is a single character repetition (like diff headers).
+
+## 2025-07-10 - [Batching Git Metadata Retrieval]
+**Learning:** Spawning Git subprocesses is expensive. For metadata retrieval across many branches (e.g., commit hashes), performing $N$ individual `git rev-parse` calls (or using `repo.commit(branch).hexsha`) introduces significant overhead that scales linearly with $N$.
+**Action:** Batch Git metadata retrieval whenever possible (e.g., `git rev-parse branch1 branch2 ...`) to reduce subprocess spawning overhead. Always include a fallback for the batch call to handle individual failures gracefully.
