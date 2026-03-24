@@ -651,14 +651,19 @@ def dashboard():
 def add_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    response.headers['Cross-Origin-Resource-Policy'] = 'same-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     csp = (
         "default-src 'self'; "
         f"style-src 'self' 'nonce-{g.get('nonce', '')}'; "
         f"script-src 'self' 'nonce-{g.get('nonce', '')}'; "
+        "img-src 'self'; "
+        "connect-src 'self'; "
         "object-src 'none'; "
-        "base-uri 'self'"
+        "base-uri 'self'; "
+        "frame-ancestors 'none'"
     )
     response.headers['Content-Security-Policy'] = csp
     return response
