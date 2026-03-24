@@ -36,3 +36,42 @@ def test_semantic_similarity_basic():
 
     s4 = "import os\nimport sys\ndef hello_world():\n    print('hello world!')\n"
     assert predictor._semantic_similarity(s1, s4) is True
+
+def test_predict_conflicts_with_busy_master(tmp_path):
+    import git
+    # Create a real repo to test triple-dot diff behavior in predictor
+    repo_dir = tmp_path / "repo"
+    repo = git.Repo.init(repo_dir)
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "Test")
+        config.set_value("user", "email", "test@example.com")
+
+    base_file = repo_dir / "base.txt"
+    base_file.write_text("initial\n")
+    repo.index.add(["base.txt"])
+    repo.index.commit("initial")
+
+    # Feature branch diverges here
+    repo.git.checkout("-b", "feature")
+    feat_file = repo_dir / "feature.txt"
+    feat_file.write_text("feature change\n")
+    repo.index.add(["feature.txt"])
+    repo.index.commit("feature change")
+
+    # Master progresses with changes that don't conflict with feature branch's NEW changes
+    repo.git.checkout("master")
+    base_file.write_text("initial\nmaster change\n")
+    repo.index.add(["base.txt"])
+    repo.index.commit("master change")
+
+    from predictor import ConflictPredictor
+    predictor = ConflictPredictor(str(repo_dir))
+
+    # Predict conflicts between master and feature
+    # Using '..' (double-dot) would show base.txt as modified in BOTH if we compared master..feature
+    # But '...' (triple-dot) only shows feature.txt as modified in feature.
+    predictions = predictor.predict_conflicts(["master", "feature"])
+
+    # There should be no conflicts because feature only added feature.txt
+    # and base.txt changes in master should NOT be attributed to the feature branch.
+    assert len(predictions) == 0

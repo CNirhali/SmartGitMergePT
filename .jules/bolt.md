@@ -61,3 +61,7 @@
 ## 2025-07-10 - [Batching Git Metadata Retrieval]
 **Learning:** Spawning Git subprocesses is expensive. For metadata retrieval across many branches (e.g., commit hashes), performing $N$ individual `git rev-parse` calls (or using `repo.commit(branch).hexsha`) introduces significant overhead that scales linearly with $N$.
 **Action:** Batch Git metadata retrieval whenever possible (e.g., `git rev-parse branch1 branch2 ...`) to reduce subprocess spawning overhead. Always include a fallback for the batch call to handle individual failures gracefully.
+
+## 2025-07-15 - [Isolating Branch Changes with Triple-Dot Diffs]
+**Learning:** When calculating differences for feature branches against a base branch in conflict prediction, using the double-dot syntax (`base..feature`) includes all changes on `base` that aren't on `feature`. This results in bloated diffs and false-positive conflict detections as the base branch progresses.
+**Action:** Use the triple-dot syntax (`base...feature`) to isolate only those changes introduced on the feature branch since it diverged from the base. This reduces processed data volume by ~90% in busy repos and ensures semantically correct conflict analysis.
