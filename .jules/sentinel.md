@@ -99,3 +99,8 @@
 **Vulnerability:** SSRF protection in `_is_internal_ip` could be bypassed using IPv4-mapped IPv6 addresses (e.g., `::ffff:127.0.0.1`) which `ipaddress.IPv6Address.is_loopback` does not always catch depending on the parser. Additionally, integer-based IP representations (decimal, hex, octal) were not explicitly blocked.
 **Learning:** Comprehensive SSRF protection requires normalizing all IP representations (including mapped addresses and alternative notations) to their canonical form before applying range checks.
 **Prevention:** Explicitly extract and validate the mapped IPv4 address from IPv4-mapped IPv6 objects. Implement explicit parsing of integer-based hostnames as IPv4 addresses to ensure they are subjected to internal range validation.
+
+## 2026-03-24 - [Command Injection via Social Engineering in Dashboard]
+**Vulnerability:** The dashboard generated a "Copy diff command" (e.g., `git diff branch1..branch2`) using unsanitized branch names. An attacker could create a branch with shell metacharacters (e.g., `main;rm -rf /`) that, when copied and pasted into a terminal, would execute arbitrary commands.
+**Learning:** Data intended for manual copy-pasting into a shell must be treated with the same security rigor as data passed to `subprocess.run(shell=True)`.
+**Prevention:** Always shell-quote parameters in commands displayed for user copy-pasting (e.g., using `shlex.quote`). Additionally, validate inputs (like branch names) against a strict whitelist of allowed characters (blocking `;`, `&`, `|`, etc.) at the source.

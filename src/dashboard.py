@@ -4,9 +4,15 @@ from predictor import ConflictPredictor
 import argparse
 from datetime import datetime, timezone
 import secrets
+import shlex
 from collections import Counter
 
 app = Flask(__name__)
+
+# 🛡️ Sentinel: Register shquote filter to safely generate shell commands
+@app.template_filter('shquote')
+def shquote_filter(s):
+    return shlex.quote(s)
 
 # BOLT: Singleton predictor and git_utils to keep in-memory cache alive across refreshes
 repo_path = "demo/conflict_scenarios/demo-repo"
@@ -233,7 +239,7 @@ template = '''
                             <span class="branch-sep" aria-hidden="true">↔</span>
                             <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                         </div>
-                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0] }}..{{ pred['branches'][1] }}">diff</button>
+                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}">diff</button>
                     </div>
                 </td>
                 <td>
