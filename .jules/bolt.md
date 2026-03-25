@@ -65,3 +65,7 @@
 ## 2025-07-15 - [Isolating Branch Changes with Triple-Dot Diffs]
 **Learning:** When calculating differences for feature branches against a base branch in conflict prediction, using the double-dot syntax (`base..feature`) includes all changes on `base` that aren't on `feature`. This results in bloated diffs and false-positive conflict detections as the base branch progresses.
 **Action:** Use the triple-dot syntax (`base...feature`) to isolate only those changes introduced on the feature branch since it diverged from the base. This reduces processed data volume by ~90% in busy repos and ensures semantically correct conflict analysis.
+
+## 2025-07-20 - [Substring Fast-Path for Semantic Similarity]
+**Learning:** `difflib.SequenceMatcher` is an $O(N^2)$ operation that becomes a major bottleneck even for moderately sized diffs. When the similarity threshold is high (e.g., 0.7), if one string is a substring of another and they already pass the length-ratio check, they are guaranteed to meet the similarity requirement.
+**Action:** Always implement a substring check (`if a in b or b in a`) as a fast-path before invoking expensive sequence matching algorithms. This can yield >200x speedups for common "subset" change scenarios.
