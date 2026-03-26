@@ -37,3 +37,15 @@
 ## 2026-03-22 - [Actionable Row-Level Commands]
 **Learning:** In data-heavy tables, exposing common terminal-based actions (like `git diff`) as one-click "Copy" buttons that appear only on row hover/focus significantly improves developer productivity without cluttering the primary UI. Using `:focus-within` ensures these actions remain discoverable and usable for keyboard/screen reader users.
 **Action:** Implement hover-triggered "action strips" or buttons for row-specific tasks and ensure accessibility via `:focus-within` and clear ARIA labels.
+
+## 2026-03-25 - [Risk-Based Data Prioritization]
+**Learning:** In monitoring dashboards, the default sort order of data lists should reflect the user's priority of risk. Placing the "base" branch first and then sorting others by their conflict count ensures that the most critical or high-friction areas are immediately visible without filtering.
+**Action:** Implement multi-level sorting that prioritizes fixed "base" items and then orders by risk/conflict metrics descending.
+
+## 2026-03-25 - [Data Freshness Feedback]
+**Learning:** Displaying only absolute timestamps (e.g., "12:03:58 UTC") forces users to perform mental math to determine data freshness. Adding a live, auto-updating relative timestamp (e.g., "(just now)") provides immediate cognitive relief and confirms the dashboard is actively monitoring the state.
+**Action:** Use a JavaScript interval to update relative timestamps from an ISO datetime attribute, ensuring they stay accurate without a page refresh.
+
+## 2026-03-25 - [Defensive Copy-Paste Quoting]
+**Learning:** When providing terminal commands for users to copy, assuming simple branch names (no spaces or special characters) leads to fragile workflows. Using shell-quoting (like `shlex.quote`) as a default for all variable components in copyable commands ensures they remain functional and safe for all users, regardless of their naming conventions.
+**Action:** Implement a `shquote` template filter for all generated shell commands to wrap variable components in single quotes.

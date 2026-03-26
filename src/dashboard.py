@@ -169,7 +169,7 @@ template = '''
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <button class="refresh-btn" aria-label="Refresh conflict predictions (Press 'r')">Refresh<kbd>r</kbd></button>
-    <div class="timestamp">Last updated: <time datetime="{{ now.isoformat() }}">{{ now.strftime('%Y-%m-%d %H:%M:%S') }} UTC</time></div>
+    <div class="timestamp">Last updated: <time id="last-updated" datetime="{{ now.isoformat() }}">{{ now.strftime('%Y-%m-%d %H:%M:%S') }} UTC</time> <span id="relative-time" style="font-size: 0.85em; margin-left: 4px;"></span></div>
     <h1 id="main-content">SmartGitMergePT Dashboard</h1>
 
     <div class="filter-container">
@@ -578,6 +578,29 @@ template = '''
             row.addEventListener('focusout', () => highlightRow(false));
         });
 
+        function updateRelativeTime() {
+            const timeEl = document.getElementById('last-updated');
+            const relativeEl = document.getElementById('relative-time');
+            if (!timeEl || !relativeEl) return;
+            const updated = new Date(timeEl.getAttribute('datetime'));
+            const diffSeconds = Math.floor((Date.now() - updated.getTime()) / 1000);
+            let text = '';
+            if (isNaN(diffSeconds)) {
+                text = '';
+            } else if (diffSeconds < 60) {
+                text = '(just now)';
+            } else if (diffSeconds < 3600) {
+                text = `(${Math.floor(diffSeconds / 60)}m ago)`;
+            } else if (diffSeconds < 86400) {
+                text = `(${Math.floor(diffSeconds / 3600)}h ago)`;
+            } else {
+                text = `(${Math.floor(diffSeconds / 86400)}d ago)`;
+            }
+            relativeEl.textContent = text;
+        }
+        setInterval(updateRelativeTime, 30000);
+        updateRelativeTime();
+
         document.addEventListener('keydown', (e) => {
             if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== filterInput) {
                 refresh();
@@ -636,6 +659,10 @@ def dashboard():
         # PALETTE: Count conflicts per branch for more informative status
         for b in pred['branches']:
             conflicting_branches[b] += 1
+
+    # PALETTE: Sort branches by (is_not_base, -conflict_count, name)
+    # This puts the base branch first, then those with most conflicts.
+    branches.sort(key=lambda b: (b != main_branch, -conflicting_branches[b], b))
 
     scenario_types = {
         'file_overlap': file_overlap_count,
