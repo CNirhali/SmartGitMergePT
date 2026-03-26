@@ -69,3 +69,7 @@
 ## 2025-07-20 - [Substring Fast-Path for Semantic Similarity]
 **Learning:** `difflib.SequenceMatcher` is an $O(N^2)$ operation that becomes a major bottleneck even for moderately sized diffs. When the similarity threshold is high (e.g., 0.7), if one string is a substring of another and they already pass the length-ratio check, they are guaranteed to meet the similarity requirement.
 **Action:** Always implement a substring check (`if a in b or b in a`) as a fast-path before invoking expensive sequence matching algorithms. This can yield >200x speedups for common "subset" change scenarios.
+
+## 2025-07-25 - [Case-Insensitive Fast-Path via Regex]
+**Learning:** For large input strings, `text.lower()` creates a full copy of the string in memory, which is $O(N)$ in time and space. When used in a fast-path check with `any()`, it's significantly slower than a single-pass `re.search` with case-insensitive flags or explicit character sets.
+**Action:** Prefer `re.search` with `[a-zA-Z]` or `re.IGNORECASE` over `text.lower()` for initial substring/character presence checks on large strings to avoid redundant memory allocations and passes.
