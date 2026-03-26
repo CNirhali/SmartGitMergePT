@@ -65,14 +65,15 @@ class ConflictPredictor:
         return branch, data
 
     def _get_lazy_sorted_lines(self, data: Dict, file: str) -> str:
-        """BOLT: Lazily calculate and memoize sorted lines in branch_data"""
-        if 'sorted_lines' not in data:
-            data['sorted_lines'] = {}
-
-        if file not in data['sorted_lines']:
-            data['sorted_lines'][file] = "\n".join(sorted(data['lines'].get(file, [])))
-
-        return data['sorted_lines'][file]
+        """BOLT: Lazily calculate and memoize sorted lines in branch_data.
+        Optimized to use .setdefault() and direct lookup to minimize dict overhead.
+        """
+        cache = data.setdefault('sorted_lines', {})
+        try:
+            return cache[file]
+        except KeyError:
+            val = cache[file] = "\n".join(sorted(data['lines'].get(file, [])))
+            return val
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
         predictions = []
@@ -262,6 +263,13 @@ class ConflictPredictor:
         len_a, len_b = len(diff_a), len(diff_b)
         if 2.0 * min(len_a, len_b) / (len_a + len_b) < 0.7:
             return False
+
+        # BOLT: Substring check fast-path
+        # If one string is a substring of the other AND the length ratio is >= 0.7,
+        # they are guaranteed to have a high similarity. This is extremely common
+        # in Git diffs (e.g., adding lines to a file) and much faster than SequenceMatcher.
+        if diff_a in diff_b or diff_b in diff_a:
+            return True
 
         seq = difflib.SequenceMatcher(None, diff_a, diff_b)
 
