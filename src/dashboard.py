@@ -9,6 +9,7 @@ from collections import Counter
 
 app = Flask(__name__)
 
+# 🛡️ Sentinel: Register shquote filter to safely generate shell commands
 @app.template_filter('shquote')
 def shquote_filter(s):
     return shlex.quote(s)
