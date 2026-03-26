@@ -104,3 +104,8 @@
 **Vulnerability:** The dashboard generated a "Copy diff command" (e.g., `git diff branch1..branch2`) using unsanitized branch names. An attacker could create a branch with shell metacharacters (e.g., `main;rm -rf /`) that, when copied and pasted into a terminal, would execute arbitrary commands.
 **Learning:** Data intended for manual copy-pasting into a shell must be treated with the same security rigor as data passed to `subprocess.run(shell=True)`.
 **Prevention:** Always shell-quote parameters in commands displayed for user copy-pasting (e.g., using `shlex.quote`). Additionally, validate inputs (like branch names) against a strict whitelist of allowed characters (blocking `;`, `&`, `|`, etc.) at the source.
+
+## 2026-03-25 - [SSRF Bypass via Percent-Encoded Null Bytes and IPv4-Compatible IPv6]
+**Vulnerability:** URL validation could be bypassed using percent-encoded null bytes (e.g., `%00`) in hostnames, which evade initial string checks but truncate URLs in downstream libraries. Additionally, IPv4-compatible IPv6 addresses (`::/96`) and IPv6 Scope IDs could be used to bypass internal range checks or cause parsing errors.
+**Learning:** Robust SSRF protection requires multiple layers of normalization and validation. Hostname unquoting must be followed by a secondary check for dangerous characters like null bytes. Transition mechanisms like `::/96` must be explicitly handled if the underlying IP library doesn't flag them as private/loopback.
+**Prevention:** Implement a 'normalize-validate-normalize-validate' pattern for URLs. Strip Scope IDs before parsing, unquote hostnames and re-verify for null bytes, and explicitly check for embedded internal IPs in both mapped and compatible IPv6 representations.
