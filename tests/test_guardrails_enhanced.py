@@ -81,3 +81,27 @@ def test_validate_url_integer_ips():
 
     # Public integer IP
     assert validator.validate_url("http://134744072")[0] is True # 8.8.8.8
+
+def test_is_internal_ip_ipv4_compatible():
+    validator = InputValidator()
+
+    # IPv4-compatible IPv6 loopback (::7f00:1)
+    ip = ipaddress.ip_address('::127.0.0.1')
+    assert validator._is_internal_ip(ip) is True
+
+    # IPv4-compatible IPv6 private (::c0a8:101)
+    ip = ipaddress.ip_address('::192.168.1.1')
+    assert validator._is_internal_ip(ip) is True
+
+    # IPv4-compatible IPv6 public (::808:808)
+    ip = ipaddress.ip_address('::8.8.8.8')
+    assert validator._is_internal_ip(ip) is False
+
+def test_validate_url_null_bytes_and_scope_id():
+    validator = InputValidator()
+
+    # Percent-encoded null byte in hostname
+    assert validator.validate_url("http://127.0.0.1%00.evil.com")[0] is False
+
+    # IPv6 with Scope ID
+    assert validator.validate_url("http://[fe80::1%eth0]")[0] is False # fe80::1 is link-local

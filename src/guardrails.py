@@ -236,6 +236,13 @@ class InputValidator:
             # Normalize hostname: unquote and strip trailing dots (e.g. localhost.)
             normalized_hostname = unquote(hostname).lower().rstrip('.')
 
+            if not normalized_hostname:
+                return False, "Invalid or empty hostname"
+
+            # 🛡️ Sentinel: Check for null bytes after unquoting to prevent percent-encoded bypasses
+            if '\0' in normalized_hostname:
+                return False, "Null byte detected in hostname after decoding"
+
             # Check for literal loopback/private hostnames
             if normalized_hostname in {'localhost', 'loopback', 'localhost.localdomain'}:
                 return False, "Local URL not allowed"
@@ -245,6 +252,11 @@ class InputValidator:
                 # Remove brackets from IPv6 literal if present
                 # 🛡️ Sentinel: Use normalized_hostname for IP checks to prevent bypasses
                 ip_str = normalized_hostname.strip('[]')
+
+                # 🛡️ Sentinel: Strip IPv6 Scope IDs (e.g., %eth0) to prevent parsing errors or bypasses
+                if '%' in ip_str:
+                    ip_str = ip_str.split('%', 1)[0]
+
                 ip = ipaddress.ip_address(ip_str)
                 if self._is_internal_ip(ip):
                     return False, f"Internal IP not allowed: {ip}"
@@ -279,10 +291,17 @@ class InputValidator:
             return False, f"URL validation error: {str(e)}"
 
     def _is_internal_ip(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
-        """Check if an IP address belongs to an internal or reserved range, including IPv4-mapped IPv6"""
+        """Check if an IP address belongs to an internal or reserved range, including IPv4-mapped/compatible IPv6"""
         # 🛡️ Sentinel: Check for IPv4-mapped IPv6 address (e.g., ::ffff:127.0.0.1)
-        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-            return self._is_internal_ip(ip.ipv4_mapped)
+        if isinstance(ip, ipaddress.IPv6Address):
+            if ip.ipv4_mapped:
+                return self._is_internal_ip(ip.ipv4_mapped)
+
+            # 🛡️ Sentinel: Check for IPv4-compatible IPv6 addresses (::/96 range)
+            # Exclude loopback (::1) and unspecified (::) which are handled by is_loopback/is_unspecified
+            if ip != ipaddress.IPv6Address('::1') and ip != ipaddress.IPv6Address('::') and ip in ipaddress.IPv6Network('::/96'):
+                # Extract embedded IPv4 (last 32 bits)
+                return self._is_internal_ip(ipaddress.IPv4Address(ip.packed[12:16]))
 
         return (
             ip.is_loopback or
