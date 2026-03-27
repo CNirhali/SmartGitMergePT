@@ -17,6 +17,7 @@ test_urls = [
     "http://[::127.0.0.1]", # IPv4-compatible IPv6 (loopback)
     "http://[::ffff:127.0.0.1]", # IPv4-mapped IPv6 (loopback)
     "http://[fe80::1%eth0]", # IPv6 with Scope ID
+    "http://100.64.0.1", # Carrier-Grade NAT (non-global)
 ]
 
 print(f"{'URL':<45} | {'Valid':<5} | {'Message'}")

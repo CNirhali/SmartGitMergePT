@@ -109,3 +109,8 @@
 **Vulnerability:** URL validation could be bypassed using percent-encoded null bytes (e.g., `%00`) in hostnames, which evade initial string checks but truncate URLs in downstream libraries. Additionally, IPv4-compatible IPv6 addresses (`::/96`) and IPv6 Scope IDs could be used to bypass internal range checks or cause parsing errors.
 **Learning:** Robust SSRF protection requires multiple layers of normalization and validation. Hostname unquoting must be followed by a secondary check for dangerous characters like null bytes. Transition mechanisms like `::/96` must be explicitly handled if the underlying IP library doesn't flag them as private/loopback.
 **Prevention:** Implement a 'normalize-validate-normalize-validate' pattern for URLs. Strip Scope IDs before parsing, unquote hostnames and re-verify for null bytes, and explicitly check for embedded internal IPs in both mapped and compatible IPv6 representations.
+
+## 2026-03-26 - [SSRF Bypass via Non-Global IP Ranges]
+**Vulnerability:** `InputValidator.validate_url` allowed SSRF bypasses via non-global IP ranges that are not strictly classified as 'private' or 'loopback' by some libraries, such as Carrier-Grade NAT (Shared Address Space) IPs (e.g., `100.64.0.0/10`).
+**Learning:** Relying solely on `ip.is_private` and `ip.is_loopback` is insufficient for comprehensive SSRF protection, as there are many non-routable or reserved IP ranges that are not intended for public access but may not be flagged as private.
+**Prevention:** Use `ip.is_global` (available in Python's `ipaddress` module) as a catch-all check to block any IP address that is not part of the public, globally routable internet. This provides a robust defense-in-depth against various reserved and internal-only ranges.

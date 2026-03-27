@@ -309,7 +309,8 @@ class InputValidator:
             ip.is_link_local or
             ip.is_multicast or
             ip.is_reserved or
-            ip.is_unspecified
+            ip.is_unspecified or
+            not ip.is_global
         )
     
     def _sanitize_html(self, text: str) -> str:
