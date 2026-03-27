@@ -1,9 +1,9 @@
 ## 2025-05-15 - [Conflict Prediction Algorithm Complexity]
-**Learning:** Identifying $O(N^2)$ patterns that involve external process calls (like `git diff`) is a high-impact optimization target. In this codebase, predicting conflicts between $N$ branches was triggering $N^2$ git calls, which is extremely slow as $N$ grows.
-**Action:** Always check if metadata needed for pairwise comparisons can be pre-calculated and cached once per item ($O(N)$), reducing the inner loop to simple in-memory operations.
+**Learning:** Identifying (N^2)$ patterns that involve external process calls (like `git diff`) is a high-impact optimization target. In this codebase, predicting conflicts between $ branches was triggering ^2$ git calls, which is extremely slow as $ grows.
+**Action:** Always check if metadata needed for pairwise comparisons can be pre-calculated and cached once per item ((N)$), reducing the inner loop to simple in-memory operations.
 
 ## 2025-05-16 - [Accelerating Diff Comparisons with Early Rejection]
-**Learning:** `difflib.SequenceMatcher.ratio()` is $O(L^2)$ in the worst case and extremely slow. Using `real_quick_ratio()` and `quick_ratio()` as early filters can skip the full computation for the majority of non-matching pairs.
+**Learning:** `difflib.SequenceMatcher.ratio()` is (L^2)$ in the worst case and extremely slow. Using `real_quick_ratio()` and `quick_ratio()` as early filters can skip the full computation for the majority of non-matching pairs.
 **Action:** Always use hierarchical similarity checks (quick filters -> full ratio) when performing batch string comparisons.
 
 ## 2025-05-20 - [Non-blocking CPU monitoring and Cache Data Integrity]
@@ -19,7 +19,7 @@
 **Action:** Use `ThreadPoolExecutor` to parallelize I/O-bound `git` command calls. This can yield ~50% performance gains in data preparation phases for large branch sets.
 
 ## 2025-05-30 - [Targeted Pairwise Comparison via Inverted Index]
-**Learning:** Naive pairwise comparison of $N$ branches is $O(N^2)$, which is devastating for performance in large repositories. Using an inverted index (mapping files to branches that modified them) reduces the search space to only those pairs that actually share modified files.
+**Learning:** Naive pairwise comparison of $ branches is (N^2)$, which is devastating for performance in large repositories. Using an inverted index (mapping files to branches that modified them) reduces the search space to only those pairs that actually share modified files.
 **Action:** When performing exhaustive pairwise checks on objects with shared attributes, always build an inverted index first to isolate relevant pairs.
 
 ## 2025-05-30 - [Context-Aware Semantic Similarity]
@@ -31,8 +31,8 @@
 **Action:** Always use lazy evaluation and memoization for expensive transformation of per-item metadata that is only needed during targeted pairwise comparisons.
 
 ## 2025-06-10 - [Regex Pattern Combination and Fast-Pathing]
-**Learning:** Calling `re.search` multiple times in a loop (e.g., for security validation) is significantly slower than combining patterns into a single grouped regex. Additionally, for "clean" inputs, expensive regex substitutions in sanitization can be entirely bypassed with $O(N)$ string checks (like `in` or `str.contains`).
-**Action:** Combine multiple independent regex patterns into a single pre-compiled regex for initial "all-clear" checks. Implement $O(N)$ fast-paths to skip expensive processing for common safe inputs.
+**Learning:** Calling `re.search` multiple times in a loop (e.g., for security validation) is significantly slower than combining patterns into a single grouped regex. Additionally, for "clean" inputs, expensive regex substitutions in sanitization can be entirely bypassed with (N)$ string checks (like `in` or `str.contains`).
+**Action:** Combine multiple independent regex patterns into a single pre-compiled regex for initial "all-clear" checks. Implement (N)$ fast-paths to skip expensive processing for common safe inputs.
 
 ## 2025-06-12 - [Hierarchical Fast-Path for String Sanitization]
 **Learning:** Initializing expensive operations like 'text.lower()' in a fast-path can still be a significant bottleneck for large inputs, even if it avoids regex. In this codebase, 'InputValidator._sanitize_html' was calling 'lower()' eagerly for every string without tags.
@@ -59,7 +59,7 @@
 **Action:** Use `real_quick_ratio()` as the first stage of any `SequenceMatcher` hierarchy. Replace `startswith` with indexing in hot loops where the match pattern is a single character repetition (like diff headers).
 
 ## 2025-07-10 - [Batching Git Metadata Retrieval]
-**Learning:** Spawning Git subprocesses is expensive. For metadata retrieval across many branches (e.g., commit hashes), performing $N$ individual `git rev-parse` calls (or using `repo.commit(branch).hexsha`) introduces significant overhead that scales linearly with $N$.
+**Learning:** Spawning Git subprocesses is expensive. For metadata retrieval across many branches (e.g., commit hashes), performing $ individual `git rev-parse` calls (or using `repo.commit(branch).hexsha`) introduces significant overhead that scales linearly with $.
 **Action:** Batch Git metadata retrieval whenever possible (e.g., `git rev-parse branch1 branch2 ...`) to reduce subprocess spawning overhead. Always include a fallback for the batch call to handle individual failures gracefully.
 
 ## 2025-07-15 - [Isolating Branch Changes with Triple-Dot Diffs]
@@ -67,9 +67,13 @@
 **Action:** Use the triple-dot syntax (`base...feature`) to isolate only those changes introduced on the feature branch since it diverged from the base. This reduces processed data volume by ~90% in busy repos and ensures semantically correct conflict analysis.
 
 ## 2025-07-20 - [Substring Fast-Path for Semantic Similarity]
-**Learning:** `difflib.SequenceMatcher` is an $O(N^2)$ operation that becomes a major bottleneck even for moderately sized diffs. When the similarity threshold is high (e.g., 0.7), if one string is a substring of another and they already pass the length-ratio check, they are guaranteed to meet the similarity requirement.
+**Learning:** `difflib.SequenceMatcher` is an (N^2)$ operation that becomes a major bottleneck even for moderately sized diffs. When the similarity threshold is high (e.g., 0.7), if one string is a substring of another and they already pass the length-ratio check, they are guaranteed to meet the similarity requirement.
 **Action:** Always implement a substring check (`if a in b or b in a`) as a fast-path before invoking expensive sequence matching algorithms. This can yield >200x speedups for common "subset" change scenarios.
 
 ## 2025-07-25 - [Case-Insensitive Fast-Path via Regex]
-**Learning:** For large input strings, `text.lower()` creates a full copy of the string in memory, which is $O(N)$ in time and space. When used in a fast-path check with `any()`, it's significantly slower than a single-pass `re.search` with case-insensitive flags or explicit character sets.
+**Learning:** For large input strings, `text.lower()` creates a full copy of the string in memory, which is (N)$ in time and space. When used in a fast-path check with `any()`, it's significantly slower than a single-pass `re.search` with case-insensitive flags or explicit character sets.
 **Action:** Prefer `re.search` with `[a-zA-Z]` or `re.IGNORECASE` over `text.lower()` for initial substring/character presence checks on large strings to avoid redundant memory allocations and passes.
+
+## 2025-07-30 - [Parallelizing I/O-Bound Merge Simulations]
+**Learning:** Sequential execution of (N^2)$ Git merge simulations (e.g., via `git merge-tree`) is a major bottleneck as the number of branches increases. While the operations are computationally intensive for the Git process, they are I/O-bound from the application's perspective due to subprocess spawning and communication.
+**Action:** Use `ThreadPoolExecutor` to parallelize I/O-bound Git merge simulations. Use the `executor.map` iterator to stream results back to the user as they complete, preventing the application from appearing frozen during long batch operations.

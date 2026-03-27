@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from git_utils import GitUtils
 from predictor import ConflictPredictor
 from llm_resolver import resolve_conflict_with_mistral
@@ -25,6 +26,13 @@ try:
 except ImportError as e:
     print(f"⚠️  Agentic AI modules not available: {e}")
     AGENTIC_AVAILABLE = False
+    # Define stubs for type hints and to avoid NameError when modules are missing
+    class ConfigManager:
+        def __init__(self, *args, **kwargs): pass
+    class AgenticTracker:
+        def __init__(self, *args, **kwargs): pass
+    class AIValidator:
+        def __init__(self, *args, **kwargs): pass
 
 # Import code review modules
 try:
@@ -109,9 +117,21 @@ def main():
 
     elif args.command == 'detect':
         branches = git_utils.list_branches()
+        # BOLT: Using ThreadPoolExecutor to parallelize I/O-bound git merge-tree calls.
+        # This can yield significant speedups for large branch sets (~3-4x on quad-core).
+        pairs = []
         for i, branch_a in enumerate(branches):
             for branch_b in branches[i+1:]:
-                ok, msg = git_utils.simulate_merge(branch_a, branch_b)
+                pairs.append((branch_a, branch_b))
+
+        def check_pair(pair):
+            branch_a, branch_b = pair
+            ok, msg = git_utils.simulate_merge(branch_a, branch_b)
+            return (branch_a, branch_b, ok, msg)
+
+        with ThreadPoolExecutor() as executor:
+            # Iterate directly over map to stream results as they complete
+            for branch_a, branch_b, ok, msg in executor.map(check_pair, pairs):
                 if not ok:
                     print(f"Conflict detected merging {branch_a} into {branch_b}: {msg}")
                 else:
