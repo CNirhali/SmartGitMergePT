@@ -173,6 +173,7 @@ template = '''
     <h1 id="main-content">SmartGitMergePT Dashboard</h1>
 
     <div class="filter-container">
+        <label for="filter-input" class="sr-only">Filter branches or conflicts</label>
         <input type="text" id="filter-input" class="filter-input" placeholder="Filter branches or conflicts... (Press '/' to focus)" aria-label="Filter branches or conflicts">
         <button id="clear-filter" class="refresh-btn" aria-label="Clear filter (Press 'Esc')">Clear<kbd>Esc</kbd></button>
         <span id="filter-results-count" aria-live="polite"></span>
@@ -239,7 +240,7 @@ template = '''
                             <span class="branch-sep" aria-hidden="true">↔</span>
                             <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                         </div>
-                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}">diff</button>
+                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}">copy diff</button>
                     </div>
                 </td>
                 <td>
@@ -276,6 +277,9 @@ template = '''
 
     <script nonce="{{ nonce }}">
         const filterInput = document.getElementById('filter-input');
+        if (filterInput) {
+            filterInput.onfocus = () => filterInput.select();
+        }
         const clearFilterBtn = document.getElementById('clear-filter');
         const refreshBtn = document.querySelector('.refresh-btn');
         if (refreshBtn) {
@@ -583,6 +587,7 @@ template = '''
             const relativeEl = document.getElementById('relative-time');
             if (!timeEl || !relativeEl) return;
             const updated = new Date(timeEl.getAttribute('datetime'));
+            relativeEl.title = updated.toLocaleString();
             const diffSeconds = Math.floor((Date.now() - updated.getTime()) / 1000);
             let text = '';
             if (isNaN(diffSeconds)) {
