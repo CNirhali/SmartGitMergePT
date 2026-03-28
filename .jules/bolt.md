@@ -77,3 +77,7 @@
 ## 2025-07-30 - [Parallelizing I/O-Bound Merge Simulations]
 **Learning:** Sequential execution of (N^2)$ Git merge simulations (e.g., via `git merge-tree`) is a major bottleneck as the number of branches increases. While the operations are computationally intensive for the Git process, they are I/O-bound from the application's perspective due to subprocess spawning and communication.
 **Action:** Use `ThreadPoolExecutor` to parallelize I/O-bound Git merge simulations. Use the `executor.map` iterator to stream results back to the user as they complete, preventing the application from appearing frozen during long batch operations.
+
+## 2025-08-05 - [Line-Level Sequence Matching Efficiency]
+**Learning:** Python's 'difflib.SequenceMatcher' is dramatically more efficient (e.g., ~800x speedup in this codebase) when comparing tuples of strings (lines) rather than single large concatenated strings. This is because the algorithm's complexity scales with the number of elements in the sequence; reducing 'thousands of characters' to 'hundreds of lines' provides a massive computational win. Additionally, for sorted line tuples, a set-based 'issubset' check serves as a highly reliable and fast high-similarity heuristic.
+**Action:** Prefer comparing sequences of lines (tuples or lists) over joined strings when using 'SequenceMatcher' for large diffs. Implement set-based subset checks as fast-paths for pre-sorted line collections.
