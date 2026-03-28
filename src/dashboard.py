@@ -170,7 +170,7 @@ template = '''
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <button class="refresh-btn" aria-label="Refresh conflict predictions (Press 'r')">Refresh<kbd>r</kbd></button>
     <div class="timestamp">Last updated: <time id="last-updated" datetime="{{ now.isoformat() }}">{{ now.strftime('%Y-%m-%d %H:%M:%S') }} UTC</time> <span id="relative-time" style="font-size: 0.85em; margin-left: 4px;"></span></div>
-    <h1 id="main-content">SmartGitMergePT Dashboard</h1>
+    <h1 id="main-content" tabindex="-1">SmartGitMergePT Dashboard</h1>
 
     <div class="filter-container">
         <label for="filter-input" class="sr-only">Filter branches or conflicts</label>
@@ -241,6 +241,7 @@ template = '''
                             <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                         </div>
                         <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}">copy diff</button>
+                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff: git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}" data-diff="git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}">diff</button>
                     </div>
                 </td>
                 <td>
@@ -302,6 +303,14 @@ template = '''
                 table.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
+
+        // PALETTE: Select text on focus for easier overwriting
+        filterInput.addEventListener('focus', () => {
+            // Using setTimeout to ensure selection happens after browser focus behavior
+            setTimeout(() => {
+                filterInput.select();
+            }, 0);
+        });
 
         function copyToClipboard(element, attr = 'data-branch', successElement = null) {
             const text = element.getAttribute(attr);
@@ -450,7 +459,6 @@ template = '''
 
         const resultsCount = document.getElementById('filter-results-count');
         const monitoredBranchTags = document.querySelectorAll('#monitored-branches-list .branch-tag');
-        const tableRows = document.querySelectorAll('tbody tr');
         const noResults = document.createElement('div');
         noResults.className = 'no-results';
         noResults.innerHTML = 'No matching branches or conflicts found. <button class="refresh-btn" aria-label="Clear filter (Press \'Esc\')">Clear filter <kbd>Esc</kbd></button>';
@@ -504,19 +512,38 @@ template = '''
             }
 
             let visibleRowsCount = 0;
+            const visibleBranchesInTable = new Set();
             if (query) {
                 clearFilterBtn.classList.add('visible');
             } else {
                 clearFilterBtn.classList.remove('visible');
             }
 
+            // PALETTE: Capture rows within the handler for robustness against DOM changes
+            const tableRows = document.querySelectorAll('tbody tr');
+
+            // PALETTE: First pass - determine visible rows and collect branches from them
+            tableRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const isVisible = text.includes(query);
+                row.style.display = isVisible ? '' : 'none';
+                if (isVisible) {
+                    visibleRowsCount++;
+                    visibleBranchesInTable.add(row.getAttribute('data-branch-a'));
+                    visibleBranchesInTable.add(row.getAttribute('data-branch-b'));
+                }
+            });
+
             // Update all branch tags (monitored list + table) for highlighting
             document.querySelectorAll('.branch-tag').forEach(tag => {
-                const text = tag.getAttribute('data-branch').toLowerCase();
+                const branchName = tag.getAttribute('data-branch');
+                const text = branchName.toLowerCase();
                 const isActive = query !== '' && text === query;
-                // Only hide in the monitored list
+                // PALETTE: Intelligent filtering - show if name matches OR if branch is in a visible conflict
                 if (tag.closest('#monitored-branches-list')) {
-                    tag.style.display = text.includes(query) ? 'inline-block' : 'none';
+                    const matchesQuery = text.includes(query);
+                    const isInVisibleConflict = visibleBranchesInTable.has(branchName);
+                    tag.style.display = (matchesQuery || isInVisibleConflict) ? 'inline-block' : 'none';
                 }
                 tag.classList.toggle('active-filter', isActive);
                 // PALETTE: Sync ARIA state
@@ -529,13 +556,6 @@ template = '''
                 el.classList.toggle('active-filter', isActive);
                 // PALETTE: Sync ARIA state
                 el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-            });
-
-            tableRows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                const isVisible = text.includes(query);
-                row.style.display = isVisible ? '' : 'none';
-                if (isVisible) visibleRowsCount++;
             });
 
             if (query === '') {

@@ -45,7 +45,19 @@ def benchmark_semantic_similarity():
     end = time.perf_counter()
 
     avg_time = (end - start) / iterations
-    print(f"Similar non-substring (new pairs) avg time: {avg_time:.6f}s")
+    print(f"Similar non-substring (new pairs, string) avg time: {avg_time:.6f}s")
+
+    # Test case: Tuple of lines (the new optimized path)
+    t1 = tuple(s1.splitlines())
+    t2 = tuple(s2.splitlines())
+    start = time.perf_counter()
+    for i in range(iterations):
+        p3 = t1 + (f"B {i}",)
+        p4 = t1 + (f"C {i}",)
+        predictor._semantic_similarity(p3, p4)
+    end = time.perf_counter()
+    avg_time = (end - start) / iterations
+    print(f"Similar non-substring (new pairs, tuple) avg time: {avg_time:.6f}s")
 
 def benchmark_lazy_sorted_lines():
     print("\n--- Benchmarking _get_lazy_sorted_lines ---")
