@@ -49,3 +49,11 @@
 ## 2026-03-25 - [Defensive Copy-Paste Quoting]
 **Learning:** When providing terminal commands for users to copy, assuming simple branch names (no spaces or special characters) leads to fragile workflows. Using shell-quoting (like `shlex.quote`) as a default for all variable components in copyable commands ensures they remain functional and safe for all users, regardless of their naming conventions.
 **Action:** Implement a `shquote` template filter for all generated shell commands to wrap variable components in single quotes.
+
+## 2026-03-28 - [Context-Aware Intelligent Filtering]
+**Learning:** In dashboards where a primary list acts as a legend for a secondary data table, strict text filtering can be disorienting if it hides related items. "Intelligent filtering" that keeps related entities (e.g., conflict partners) visible even if they don't match the query directly maintains situational awareness and reduces "context switching" cognitive load.
+**Action:** Implement multi-pass filtering logic that identifies and preserves "partner" entities linked to currently visible primary results.
+
+## 2026-03-28 - [Robust Selection on Focus]
+**Learning:** Browser-native focus behavior can often reset the cursor position *after* a standard `focus` event listener executes, negating a simple `.select()` call. Using `setTimeout(..., 0)` or `requestAnimationFrame` ensures the selection logic runs after the browser's default positioning, providing a much more reliable "select-on-focus" experience.
+**Action:** Always wrap `.select()` calls in a `setTimeout(() => ..., 0)` when triggered by a `focus` or `click` event to ensure reliability across all browsers.
