@@ -240,8 +240,14 @@ template = '''
                             <span class="branch-sep" aria-hidden="true">↔</span>
                             <span class="branch-tag {{ 'base-branch' if is_base_b }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][1] }}{{ ' (base branch)' if is_base_b }}" title="Filter and copy" data-branch="{{ pred['branches'][1] }}">{{ pred['branches'][1] }}{% if is_base_b %} <small aria-hidden="true">(base)</small>{% endif %}</span>
                         </div>
-                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff command" data-diff="git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}">copy diff</button>
-                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy git diff: git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}" data-diff="git diff {{ pred['branches'][0]|shquote }}..{{ pred['branches'][1]|shquote }}">diff</button>
+                        {% if is_base_a %}
+                            {% set diff_cmd = "git diff " ~ (pred['branches'][0]|shquote) ~ "..." ~ (pred['branches'][1]|shquote) %}
+                        {% elif is_base_b %}
+                            {% set diff_cmd = "git diff " ~ (pred['branches'][1]|shquote) ~ "..." ~ (pred['branches'][0]|shquote) %}
+                        {% else %}
+                            {% set diff_cmd = "git diff " ~ (pred['branches'][0]|shquote) ~ ".." ~ (pred['branches'][1]|shquote) %}
+                        {% endif %}
+                        <button class="copy-diff-btn" aria-label="Copy git diff command for {{ pred['branches'][0] }} and {{ pred['branches'][1] }}" title="Copy: {{ diff_cmd }}" data-diff="{{ diff_cmd }}">📋 diff</button>
                     </div>
                 </td>
                 <td>
@@ -277,6 +283,7 @@ template = '''
     {% endif %}
 
     <script nonce="{{ nonce }}">
+        const tableRows = document.querySelectorAll('tbody tr');
         const filterInput = document.getElementById('filter-input');
         if (filterInput) {
             filterInput.onfocus = () => filterInput.select();
@@ -520,10 +527,10 @@ template = '''
             }
 
             // PALETTE: Capture rows within the handler for robustness against DOM changes
-            const tableRows = document.querySelectorAll('tbody tr');
+            const currentTableRows = document.querySelectorAll('tbody tr');
 
             // PALETTE: First pass - determine visible rows and collect branches from them
-            tableRows.forEach(row => {
+            currentTableRows.forEach(row => {
                 const text = row.textContent.toLowerCase();
                 const isVisible = text.includes(query);
                 row.style.display = isVisible ? '' : 'none';
