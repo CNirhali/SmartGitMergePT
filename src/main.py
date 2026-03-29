@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from git_utils import GitUtils
 from predictor import ConflictPredictor
 from llm_resolver import resolve_conflict_with_mistral
+from guardrails import InputValidator
 
 # Import guardrails and optimization systems
 try:
@@ -431,6 +432,12 @@ def configure_llm_settings(config_manager: ConfigManager):
         if not endpoint:
             endpoint = 'http://localhost:11434/v1/chat/completions'
         
+        # 🛡️ Sentinel: Validate URL to prevent SSRF (allow local for Ollama)
+        is_valid, msg = InputValidator().validate_url(endpoint, allow_local=True)
+        if not is_valid:
+            print(f"❌ Invalid endpoint: {msg}")
+            return
+
         model = input("Enter Ollama model name (default: mistral): ").strip()
         if not model:
             model = 'mistral'
@@ -465,6 +472,12 @@ def configure_llm_settings(config_manager: ConfigManager):
         if not endpoint:
             endpoint = 'http://localhost:11434/v1/chat/completions'
         
+        # 🛡️ Sentinel: Validate URL to prevent SSRF (allow local for legacy Mistral)
+        is_valid, msg = InputValidator().validate_url(endpoint, allow_local=True)
+        if not is_valid:
+            print(f"❌ Invalid endpoint: {msg}")
+            return
+
         model = input("Enter Mistral model name (default: mistral-7b-instruct): ").strip()
         if not model:
             model = 'mistral-7b-instruct'
@@ -497,7 +510,13 @@ def configure_llm_settings(config_manager: ConfigManager):
                 test_mistral_connection(endpoint, model)
 
 def test_ollama_connection(endpoint: str, model: str):
-    """Test connection to local Ollama server"""
+    """Test connection to local Ollama server with SSRF protection"""
+    # 🛡️ Sentinel: Validate URL to prevent SSRF (allow local)
+    is_valid, msg = InputValidator().validate_url(endpoint, allow_local=True)
+    if not is_valid:
+        print(f"❌ Connection test failed: {msg}")
+        return
+
     print(f"🧪 Testing Ollama connection to {endpoint}...")
     
     try:
@@ -534,7 +553,13 @@ def test_ollama_connection(endpoint: str, model: str):
         print(f"❌ Connection test failed: {e}")
 
 def test_mistral_connection(endpoint: str, model: str):
-    """Test connection to local Mistral server"""
+    """Test connection to local Mistral server with SSRF protection"""
+    # 🛡️ Sentinel: Validate URL to prevent SSRF (allow local)
+    is_valid, msg = InputValidator().validate_url(endpoint, allow_local=True)
+    if not is_valid:
+        print(f"❌ Connection test failed: {msg}")
+        return
+
     print(f"🧪 Testing Mistral connection to {endpoint}...")
     
     try:
