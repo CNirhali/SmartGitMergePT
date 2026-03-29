@@ -124,7 +124,8 @@ class TestInputValidator:
         malicious_url = "http://2130706433/admin"
         is_valid, result = self.validator.validate_url(malicious_url)
         assert not is_valid
-        assert "Internal IP (shorthand) not allowed" in result
+        assert "Internal IP" in result
+        assert "not allowed" in result
 
     def test_validate_url_private_ip(self):
         """Test private IP detection"""

@@ -12,10 +12,11 @@ from pathlib import Path
 
 # Import guardrails and optimization if available
 try:
-    from guardrails import with_guardrails, secure_function
+    from guardrails import with_guardrails, secure_function, InputValidator
     from optimizer import cached_function
     GUARDRAILS_AVAILABLE = True
 except ImportError:
+    from guardrails import InputValidator
     GUARDRAILS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ class MistralCodeReviewer:
         self.config = config or ReviewConfig()
         self.ollama_endpoint = "http://localhost:11434/v1/chat/completions"
         self.model = "mistral"
+        self.input_validator = InputValidator()
         
         # Initialize logging
         logging.basicConfig(level=logging.INFO)
@@ -266,8 +268,14 @@ Be thorough but practical. Only block commits for critical issues."""
         return prompt
     
     def _call_mistral(self, prompt: str) -> str:
-        """Call Mistral via Ollama API"""
+        """Call Mistral via Ollama API with SSRF protection"""
         try:
+            # 🛡️ Sentinel: Validate URL to prevent SSRF (allow local for Ollama/Mistral)
+            is_valid, msg = self.input_validator.validate_url(self.ollama_endpoint, allow_local=True)
+            if not is_valid:
+                logger.error(f"SSRF Protection: Blocked request to invalid endpoint: {msg}")
+                return ""
+
             import requests
             
             payload = {

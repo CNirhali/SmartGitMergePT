@@ -207,7 +207,7 @@ class InputValidator:
         except Exception as e:
             return False, f"Path validation error: {str(e)}"
     
-    def validate_url(self, url: str) -> Tuple[bool, str]:
+    def validate_url(self, url: str, allow_local: bool = False) -> Tuple[bool, str]:
         """Validate URL for security (SSRF and protocol bypass protection)"""
         try:
             if not isinstance(url, str):
@@ -244,7 +244,7 @@ class InputValidator:
                 return False, "Null byte detected in hostname after decoding"
 
             # Check for literal loopback/private hostnames
-            if normalized_hostname in {'localhost', 'loopback', 'localhost.localdomain'}:
+            if not allow_local and normalized_hostname in {'localhost', 'loopback', 'localhost.localdomain'}:
                 return False, "Local URL not allowed"
 
             # Handle IP-based hostnames for robust SSRF protection
@@ -258,7 +258,7 @@ class InputValidator:
                     ip_str = ip_str.split('%', 1)[0]
 
                 ip = ipaddress.ip_address(ip_str)
-                if self._is_internal_ip(ip):
+                if not allow_local and self._is_internal_ip(ip):
                     return False, f"Internal IP not allowed: {ip}"
 
             except ValueError:
@@ -269,7 +269,7 @@ class InputValidator:
                         ip_int = int(normalized_hostname, 0)
                         if 0 <= ip_int <= 0xFFFFFFFF:
                             ip = ipaddress.IPv4Address(ip_int)
-                            if self._is_internal_ip(ip):
+                            if not allow_local and self._is_internal_ip(ip):
                                 return False, f"Internal IP (integer) not allowed: {ip}"
                 except (ValueError, OverflowError):
                     pass
@@ -280,7 +280,7 @@ class InputValidator:
                     packed_ip = socket.inet_aton(normalized_hostname)
                     ip_str = socket.inet_ntoa(packed_ip)
                     ip = ipaddress.ip_address(ip_str)
-                    if self._is_internal_ip(ip):
+                    if not allow_local and self._is_internal_ip(ip):
                         return False, f"Internal IP (shorthand) not allowed: {ip}"
                 except (socket.error, ValueError):
                     # Hostname is truly not an IP or invalid IP

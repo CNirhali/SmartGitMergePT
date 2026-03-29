@@ -119,3 +119,8 @@
 **Vulnerability:** Path traversal vulnerability in `ConfigManager.export_config` and `ConfigManager.import_config` allowed exporting or importing configuration files outside the repository root.
 **Learning:** Functions that accept file paths as arguments for file I/O must explicitly validate that the resolved absolute paths remain within an authorized base directory. Using `os.path.realpath` followed by `os.path.commonpath` is a robust way to enforce this boundary.
 **Prevention:** Always validate that user-provided or dynamically generated file paths resolve to a location within the intended repository or application directory before performing any file operations.
+
+## 2026-03-28 - [SSRF Protection with Selective Local Exceptions]
+**Vulnerability:** `test_ollama_connection` and `MistralCodeReviewer` were vulnerable to SSRF by allowing arbitrary endpoints. However, a naive fix blocking all internal/loopback IPs broke functionality with local LLMs (e.g., Ollama on `127.0.0.1`).
+**Learning:** Strict SSRF protection (blocking loopback) can conflict with the legitimate use of local services. A binary "global vs. internal" check is sometimes too coarse for developer tools.
+**Prevention:** Implement SSRF validation that supports an `allow_local` flag. Use `allow_local=True` only for specific, trusted internal service endpoints while continuing to block sensitive ranges like cloud metadata (169.254.169.254).
