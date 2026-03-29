@@ -302,6 +302,14 @@ class ConfigManager:
     def export_config(self, filepath: str):
         """Export configuration to file"""
         try:
+            # 🛡️ Sentinel: Validate path to prevent traversal
+            abs_repo_path = os.path.realpath(self.repo_path)
+            abs_export_path = os.path.realpath(filepath)
+
+            if os.path.commonpath([abs_repo_path, abs_export_path]) != abs_repo_path:
+                print(f"❌ Error: Export path must be within the repository: {self.repo_path}")
+                return
+
             config_data = {
                 'tracking': asdict(self.tracking),
                 'privacy': asdict(self.privacy),
@@ -321,6 +329,14 @@ class ConfigManager:
     def import_config(self, filepath: str):
         """Import configuration from file"""
         try:
+            # 🛡️ Sentinel: Validate path to prevent traversal
+            abs_repo_path = os.path.realpath(self.repo_path)
+            abs_import_path = os.path.realpath(filepath)
+
+            if os.path.commonpath([abs_repo_path, abs_import_path]) != abs_repo_path:
+                print(f"❌ Error: Import path must be within the repository: {self.repo_path}")
+                return
+
             with open(filepath, 'r') as f:
                 config_data = json.load(f)
             

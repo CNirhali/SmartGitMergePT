@@ -114,3 +114,8 @@
 **Vulnerability:** `InputValidator.validate_url` allowed SSRF bypasses via non-global IP ranges that are not strictly classified as 'private' or 'loopback' by some libraries, such as Carrier-Grade NAT (Shared Address Space) IPs (e.g., `100.64.0.0/10`).
 **Learning:** Relying solely on `ip.is_private` and `ip.is_loopback` is insufficient for comprehensive SSRF protection, as there are many non-routable or reserved IP ranges that are not intended for public access but may not be flagged as private.
 **Prevention:** Use `ip.is_global` (available in Python's `ipaddress` module) as a catch-all check to block any IP address that is not part of the public, globally routable internet. This provides a robust defense-in-depth against various reserved and internal-only ranges.
+
+## 2026-03-27 - [Path Traversal in ConfigManager]
+**Vulnerability:** Path traversal vulnerability in `ConfigManager.export_config` and `ConfigManager.import_config` allowed exporting or importing configuration files outside the repository root.
+**Learning:** Functions that accept file paths as arguments for file I/O must explicitly validate that the resolved absolute paths remain within an authorized base directory. Using `os.path.realpath` followed by `os.path.commonpath` is a robust way to enforce this boundary.
+**Prevention:** Always validate that user-provided or dynamically generated file paths resolve to a location within the intended repository or application directory before performing any file operations.
