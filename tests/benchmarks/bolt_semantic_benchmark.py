@@ -64,7 +64,8 @@ def benchmark_lazy_sorted_lines():
     predictor = ConflictPredictor()
 
     data = {
-        'lines': {f'file_{i}.txt': {f'line {j}' for j in range(100)} for i in range(100)}
+        'lines': {f'file_{i}.txt': {f'line {j}' for j in range(100)} for i in range(100)},
+        'sorted_lines': {}
     }
 
     # Subsequent access (cache hits)

@@ -81,3 +81,11 @@
 ## 2025-08-05 - [Line-Level Sequence Matching Efficiency]
 **Learning:** Python's 'difflib.SequenceMatcher' is dramatically more efficient (e.g., ~800x speedup in this codebase) when comparing tuples of strings (lines) rather than single large concatenated strings. This is because the algorithm's complexity scales with the number of elements in the sequence; reducing 'thousands of characters' to 'hundreds of lines' provides a massive computational win. Additionally, for sorted line tuples, a set-based 'issubset' check serves as a highly reliable and fast high-similarity heuristic.
 **Action:** Prefer comparing sequences of lines (tuples or lists) over joined strings when using 'SequenceMatcher' for large diffs. Implement set-based subset checks as fast-paths for pre-sorted line collections.
+
+## 2025-08-10 - [O(N) vs O(1) in Hot Pairwise Loops]
+**Learning:** In O(N^2) pairwise comparisons, even "fast" O(N) operations like 'set(tuple)' become major bottlenecks when repeated for every pair. Bypassing redundant O(N) conversions by passing pre-calculated objects directly to helper functions yielded measurable gains. Additionally, while 'setdefault()' is convenient for lazy caching, pre-initializing the cache structure in the O(N) data-gathering phase allows for faster direct dict access in the O(N^2) hot loop.
+**Action:** Always pre-calculate and pass reusable data structures to inner loops of pairwise algorithms. Pre-initialize lazy cache containers to enable direct indexing instead of 'setdefault()' or 'in' checks in performance-critical paths.
+
+## 2025-08-12 - [Guarding Indexing for Performance]
+**Learning:** Manual indexing (e.g., 'line[1] == c0') is significantly faster than 'line.startswith()' in Python but introduces 'IndexError' risks for short inputs (like empty line diffs '+').
+**Action:** When using direct indexing for micro-optimization in parsing loops, always guard with explicit 'len()' checks to ensure safety without sacrificing the performance win of avoiding method dispatch.

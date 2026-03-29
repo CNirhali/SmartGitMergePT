@@ -37,6 +37,9 @@ class ConflictPredictor:
 
         cached_data = self.cache.get(cache_key, is_hash=True)
         if cached_data:
+            # BOLT: Ensure lazy cache is present for legacy cached entries
+            if 'sorted_lines' not in cached_data:
+                cached_data['sorted_lines'] = {}
             return branch, cached_data
 
         if branch == main_branch:
@@ -58,7 +61,8 @@ class ConflictPredictor:
             # BOLT: Removed large 'diff' string to save memory and I/O
             'files': files,
             'lines': lines,
-            # BOLT: Removed eager 'sorted_lines' calculation to improve O(N) phase
+            # BOLT: Pre-initialize lazy cache to avoid setdefault() overhead in hot loops
+            'sorted_lines': {},
             'commit': commit_hash
         }
         self.cache.set(cache_key, data, is_hash=True)
@@ -68,10 +72,12 @@ class ConflictPredictor:
         """BOLT: Lazily calculate and memoize sorted lines in branch_data.
         Returns a tuple of lines instead of a joined string to speed up SequenceMatcher.
         """
-        cache = data.setdefault('sorted_lines', {})
+        # BOLT: Using direct access as 'sorted_lines' is now pre-initialized
+        cache = data['sorted_lines']
         try:
             return cache[file]
         except KeyError:
+            # BOLT: data['lines'][file] is already a set, so sorted() is efficient
             val = cache[file] = tuple(sorted(data['lines'].get(file, [])))
             return val
 
@@ -181,7 +187,10 @@ class ConflictPredictor:
                             for common_f in overlap:
                                 content_a = self._get_lazy_sorted_lines(data_a, common_f)
                                 content_b = self._get_lazy_sorted_lines(data_b, common_f)
-                                if self._semantic_similarity(content_a, content_b):
+                                # BOLT: Pass pre-calculated line sets to avoid redundant set creation in fast-path
+                                if self._semantic_similarity(content_a, content_b,
+                                                            data_a['lines'][common_f],
+                                                            data_b['lines'][common_f]):
                                     semantic_conflict = True
                                     break
 
@@ -197,7 +206,7 @@ class ConflictPredictor:
                         })
         return predictions
 
-    def _get_diff_metadata(self, diff: str) -> Tuple[Set[str], Dict[str, Set[str]]]:
+    def _get_diff_metadata(self, diff: str, skip_lines: bool = False) -> Tuple[Set[str], Dict[str, Set[str]]]:
         """BOLT: Optimized extraction of changed files and lines"""
         files = set()
         lines_by_file = {}
@@ -210,7 +219,7 @@ class ConflictPredictor:
 
             c0 = line[0]
             if c0 == '+' or c0 == '-':
-                if current_lines is not None:
+                if not skip_lines and current_lines is not None:
                     # BOLT: Optimized header skip check: check 2nd and 3rd chars
                     # Using indexing is faster than startswith('+++')/startswith('---')
                     # because it avoids a method call and argument string creation.
@@ -225,15 +234,16 @@ class ConflictPredictor:
                     if b_idx != -1:
                         current_file = line[b_idx + 3:]
                         files.add(current_file)
-                        current_lines = set()
-                        lines_by_file[current_file] = current_lines
+                        if not skip_lines:
+                            current_lines = set()
+                            lines_by_file[current_file] = current_lines
                     else:
                         current_lines = None
         return files, lines_by_file
 
     def _extract_changed_files(self, diff: str) -> List[str]:
         # Maintained for backward compatibility but using _get_diff_metadata internally is better
-        files, _ = self._get_diff_metadata(diff)
+        files, _ = self._get_diff_metadata(diff, skip_lines=True)
         return list(files)
 
     def _line_level_overlap(self, diff_a: str, diff_b: str) -> bool:
@@ -246,9 +256,10 @@ class ConflictPredictor:
                 return True
         return False
 
-    @functools.lru_cache(maxsize=1024)
-    def _semantic_similarity(self, diff_a: Union[str, Tuple[str, ...]], diff_b: Union[str, Tuple[str, ...]]) -> bool:
-        # BOLT: SequenceMatcher is expensive. Use quick_ratio for early rejection.
+    def _semantic_similarity(self, diff_a: Union[str, Tuple[str, ...]], diff_b: Union[str, Tuple[str, ...]],
+                            set_a: Set[str] = None, set_b: Set[str] = None) -> bool:
+        """BOLT: High-level semantic similarity check with O(1) and O(N) fast-paths."""
+        # BOLT: Identity and length-based early rejection are O(1) and shouldn't be cached
         if not diff_a or not diff_b:
             return False
 
@@ -257,26 +268,28 @@ class ConflictPredictor:
             return True
 
         # BOLT: Length-based early rejection
-        # If the inputs have significantly different lengths, the similarity ratio
-        # cannot physically exceed 0.7. Mathematical upper bound: 2*min(L1, L2)/(L1+L2)
-        # This is O(1) and replaces the more expensive seq.real_quick_ratio() check.
         len_a, len_b = len(diff_a), len(diff_b)
         if 2.0 * min(len_a, len_b) / (len_a + len_b) < 0.7:
             return False
 
         # BOLT: Substring/Subset check fast-path
-        # If one is a substring/subset of the other AND the length ratio is >= 0.7,
-        # they are guaranteed to have a high similarity. This is common in Git diffs
-        # (e.g., adding lines) and much faster than SequenceMatcher.
         if isinstance(diff_a, str) and isinstance(diff_b, str):
             if diff_a in diff_b or diff_b in diff_a:
                 return True
         else:
+            # BOLT: Use pre-calculated sets if available to avoid O(N) set(tuple) overhead
             # For line tuples, use set-based subset check as a fast heuristic
-            set_a, set_b = set(diff_a), set(diff_b)
-            if set_a.issubset(set_b) or set_b.issubset(set_a):
+            s_a = set_a if set_a is not None else set(diff_a)
+            s_b = set_b if set_b is not None else set(diff_b)
+            if s_a.issubset(s_b) or s_b.issubset(s_a):
                 return True
 
+        # BOLT: Fall back to cached SequenceMatcher for expensive ratio calculations
+        return self._cached_similarity_ratio(diff_a, diff_b)
+
+    @functools.lru_cache(maxsize=1024)
+    def _cached_similarity_ratio(self, diff_a: Union[str, Tuple[str, ...]], diff_b: Union[str, Tuple[str, ...]]) -> bool:
+        """BOLT: Memoized SequenceMatcher logic for true similarity ratios."""
         # BOLT: difflib.SequenceMatcher is significantly faster (e.g. ~70x) when
         # comparing lists/tuples of strings compared to single large joined strings.
         seq = difflib.SequenceMatcher(None, diff_a, diff_b)
