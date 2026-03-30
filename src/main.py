@@ -118,21 +118,34 @@ def main():
 
     elif args.command == 'detect':
         branches = git_utils.list_branches()
-        # BOLT: Using ThreadPoolExecutor to parallelize I/O-bound git merge-tree calls.
-        # This can yield significant speedups for large branch sets (~3-4x on quad-core).
-        pairs = []
-        for i, branch_a in enumerate(branches):
-            for branch_b in branches[i+1:]:
-                pairs.append((branch_a, branch_b))
+        # BOLT: Optimization - Use ConflictPredictor to pre-filter branch pairs.
+        # Only perform the expensive 'git merge-tree' simulation for pairs that
+        # are predicted to have at least one modified file in common.
+        # This reduces the number of git calls from O(N^2) to O(Pairs with overlap).
+        predictions = predictor.predict_conflicts(branches)
+        candidate_pairs = [p['branches'] for p in predictions]
+        candidate_set = set(tuple(sorted(p)) for p in candidate_pairs)
 
         def check_pair(pair):
             branch_a, branch_b = pair
             ok, msg = git_utils.simulate_merge(branch_a, branch_b)
             return (branch_a, branch_b, ok, msg)
 
+        # To maintain original output behavior (listing "No conflict" for all),
+        # we generate all pairs but skip simulation for non-candidates.
+        all_pairs = []
+        for i, branch_a in enumerate(branches):
+            for branch_b in branches[i+1:]:
+                all_pairs.append((branch_a, branch_b))
+
         with ThreadPoolExecutor() as executor:
-            # Iterate directly over map to stream results as they complete
-            for branch_a, branch_b, ok, msg in executor.map(check_pair, pairs):
+            # For candidate pairs, run simulation. For others, skip and report OK.
+            def optimized_check(pair):
+                if tuple(sorted(pair)) in candidate_set:
+                    return check_pair(pair)
+                return (pair[0], pair[1], True, "No shared files modified.")
+
+            for branch_a, branch_b, ok, msg in executor.map(optimized_check, all_pairs):
                 if not ok:
                     print(f"Conflict detected merging {branch_a} into {branch_b}: {msg}")
                 else:
