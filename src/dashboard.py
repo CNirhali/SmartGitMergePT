@@ -254,7 +254,7 @@ template = '''
                     {% if pred['files'] %}
                         <span class="sr-only">File Overlap</span>
                         {% for file in pred['files'] %}
-                            <code class="file-tag" role="button" tabindex="0" aria-label="Click to copy file path: {{ file }}" title="Click to copy" data-copy="{{ file }}">{{ file }}</code>{% if not loop.last %}, {% endif %}
+                            <code class="file-tag" role="button" tabindex="0" aria-label="Click to copy and filter by file path: {{ file }}" title="Click to copy and filter" data-copy="{{ file }}">{{ file }}</code>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     {% else %}
                         <span class="absent" aria-label="No files overlap">—</span>
@@ -434,10 +434,9 @@ template = '''
             tag.addEventListener('click', (e) => {
                 e.stopPropagation();
                 copyToClipboard(tag, attr);
-                // PALETTE: Universal filtering for ALL branch tags
-                if (!isFile) {
-                    applyGlobalFilter(tag.getAttribute('data-branch'));
-                }
+                // PALETTE: Universal filtering for ALL tags (branches and files)
+                const filterVal = isFile ? tag.getAttribute('data-copy') : tag.getAttribute('data-branch');
+                applyGlobalFilter(filterVal);
             });
 
             if (isFile) {
@@ -456,10 +455,9 @@ template = '''
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     copyToClipboard(tag, attr);
-                    // PALETTE: Universal filtering for ALL branch tags via keyboard
-                    if (!isFile) {
-                        applyGlobalFilter(tag.getAttribute('data-branch'));
-                    }
+                    // PALETTE: Universal filtering for ALL tags via keyboard
+                    const filterVal = isFile ? tag.getAttribute('data-copy') : tag.getAttribute('data-branch');
+                    applyGlobalFilter(filterVal);
                 }
             });
         });
@@ -468,8 +466,16 @@ template = '''
         const monitoredBranchTags = document.querySelectorAll('#monitored-branches-list .branch-tag');
         const noResults = document.createElement('div');
         noResults.className = 'no-results';
-        noResults.innerHTML = 'No matching branches or conflicts found. <button class="refresh-btn" aria-label="Clear filter (Press \'Esc\')">Clear filter <kbd>Esc</kbd></button>';
-        noResults.querySelector('button').addEventListener('click', () => {
+        noResults.textContent = 'No matching branches or conflicts found. ';
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'refresh-btn';
+        clearBtn.setAttribute('aria-label', "Clear filter (Press 'Esc')");
+        clearBtn.textContent = 'Clear filter ';
+        const kbd = document.createElement('kbd');
+        kbd.textContent = 'Esc';
+        clearBtn.appendChild(kbd);
+        noResults.appendChild(clearBtn);
+        clearBtn.addEventListener('click', () => {
             filterInput.value = '';
             filterInput.dispatchEvent(new Event('input'));
             filterInput.focus();
