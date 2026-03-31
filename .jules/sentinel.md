@@ -124,3 +124,8 @@
 **Vulnerability:** `test_ollama_connection` and `MistralCodeReviewer` were vulnerable to SSRF by allowing arbitrary endpoints. However, a naive fix blocking all internal/loopback IPs broke functionality with local LLMs (e.g., Ollama on `127.0.0.1`).
 **Learning:** Strict SSRF protection (blocking loopback) can conflict with the legitimate use of local services. A binary "global vs. internal" check is sometimes too coarse for developer tools.
 **Prevention:** Implement SSRF validation that supports an `allow_local` flag. Use `allow_local=True` only for specific, trusted internal service endpoints while continuing to block sensitive ranges like cloud metadata (169.254.169.254).
+
+## 2026-03-30 - [SSRF Bypass via IPv6 Transition Mechanisms]
+**Vulnerability:** `InputValidator._is_internal_ip` could be bypassed using 6to4 (`2002::/16`) and Teredo (`2001:0::/32`) IPv6 addresses which encapsulate internal IPv4 addresses.
+**Learning:** Standard IP range checks (like `is_private` or `is_global`) on the top-level IPv6 address do not automatically inspect embedded IPv4 addresses used in transition protocols, allowing attackers to reach internal IPv4 services via IPv6.
+**Prevention:** Explicitly detect addresses within 6to4 and Teredo ranges, extract the embedded IPv4 address (handling Teredo's XOR obfuscation), and recursively validate it against internal/private IP ranges.

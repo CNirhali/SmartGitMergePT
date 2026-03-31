@@ -121,6 +121,9 @@ class InputValidator:
             r'token\s*[:=]\s*\S+',
             r'secret\s*[:=]\s*\S+',
             r'private_key\s*[:=]\s*\S+',
+            r'Authorization:\s*(Bearer|Basic)\s+\S+',
+            r'AKIA[0-9A-Z]{16}',
+            r'aws_secret_access_key\s*[:=]\s*\S+',
         ]
         self._sensitive_re = re.compile('|'.join(sensitive_patterns), re.IGNORECASE)
         
@@ -302,6 +305,17 @@ class InputValidator:
             if ip != ipaddress.IPv6Address('::1') and ip != ipaddress.IPv6Address('::') and ip in ipaddress.IPv6Network('::/96'):
                 # Extract embedded IPv4 (last 32 bits)
                 return self._is_internal_ip(ipaddress.IPv4Address(ip.packed[12:16]))
+
+            # 🛡️ Sentinel: Check for 6to4 (2002::/16)
+            if ip in ipaddress.IPv6Network('2002::/16'):
+                # Extract embedded IPv4 (bits 16-47)
+                return self._is_internal_ip(ipaddress.IPv4Address(ip.packed[2:6]))
+
+            # 🛡️ Sentinel: Check for Teredo (2001:0::/32)
+            if ip in ipaddress.IPv6Network('2001:0::/32'):
+                # Extract embedded IPv4 (last 32 bits, XORed with 0xFFFFFFFF)
+                ipv4_bytes = bytes([b ^ 0xFF for b in ip.packed[12:16]])
+                return self._is_internal_ip(ipaddress.IPv4Address(ipv4_bytes))
 
         return (
             ip.is_loopback or
