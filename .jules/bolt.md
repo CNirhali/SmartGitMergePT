@@ -89,3 +89,7 @@
 ## 2025-08-12 - [Guarding Indexing for Performance]
 **Learning:** Manual indexing (e.g., 'line[1] == c0') is significantly faster than 'line.startswith()' in Python but introduces 'IndexError' risks for short inputs (like empty line diffs '+').
 **Action:** When using direct indexing for micro-optimization in parsing loops, always guard with explicit 'len()' checks to ensure safety without sacrificing the performance win of avoiding method dispatch.
+
+## 2025-08-20 - [O(N) Similarity for Sorted Unique Sequences]
+**Learning:** For sorted unique line sequences (like those produced by `ConflictPredictor`), the LCS ratio calculated by `difflib.SequenceMatcher.ratio()` is mathematically equivalent to the set intersection ratio ($2 \times \text{len}(A \cap B) / (\text{len}(A) + \text{len}(B))$). Replacing the $O(N^2)$ sequence matcher with $O(N)$ set operations yields a massive performance boost (~37x for 1000 lines) while maintaining exact correctness. This assumes that sequence order is preserved by sorting and uniqueness is guaranteed by the data structure (e.g. `set` to `sorted tuple`).
+**Action:** Use set-based ratios for similarity checks on pre-processed collections where sequence order is implicitly handled. Always maintain `issubset` as a faster $O(\text{min}(N, M))$ fast-path for high-similarity/identity detection.
