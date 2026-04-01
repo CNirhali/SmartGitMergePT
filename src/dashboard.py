@@ -300,8 +300,17 @@ template = '''
         }
 
         function applyGlobalFilter(filterValue) {
-            // PALETTE: Toggle filter off if already active
-            filterInput.value = filterInput.value.toLowerCase() === filterValue.toLowerCase() ? '' : filterValue;
+            // PALETTE: Additive filtering - toggle term in space-separated query
+            const terms = filterInput.value.split(/\\s+/).filter(t => t !== '');
+            const lowerFilter = filterValue.toLowerCase();
+            const index = terms.findIndex(t => t.toLowerCase() === lowerFilter);
+
+            if (index > -1) {
+                terms.splice(index, 1);
+            } else {
+                terms.push(filterValue);
+            }
+            filterInput.value = terms.join(' ');
             filterInput.dispatchEvent(new Event('input'));
             filterInput.focus();
             // Smooth scroll to table if not in view
@@ -319,7 +328,7 @@ template = '''
             }, 0);
         });
 
-        function copyToClipboard(element, attr = 'data-branch', successElement = null) {
+        function copyToClipboard(element, attr = 'data-branch', successElement = null, updateText = false) {
             const text = element.getAttribute(attr);
             if (element.querySelector('.copy-tooltip')) return;
             navigator.clipboard.writeText(text).then(() => {
@@ -330,6 +339,13 @@ template = '''
 
                 const el = successElement || element;
                 el.classList.add('copy-success');
+
+                let originalHTML = '';
+                if (updateText) {
+                    originalHTML = element.innerHTML;
+                    element.textContent = 'Copied!';
+                }
+
                 const announcer = document.getElementById('announcer');
                 if (announcer) {
                     announcer.textContent = `Copied ${text} to clipboard`;
@@ -337,8 +353,10 @@ template = '''
 
                 setTimeout(() => {
                     tooltip.remove();
-                    element.classList.remove('copy-success');
-                    if (successElement) successElement.classList.remove('copy-success');
+                    el.classList.remove('copy-success');
+                    if (updateText) {
+                        element.innerHTML = originalHTML;
+                    }
                     if (announcer) announcer.textContent = '';
                 }, 1000);
             });
@@ -424,7 +442,7 @@ template = '''
         document.querySelectorAll('.copy-diff-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                copyToClipboard(btn, 'data-diff', btn.closest('tr'));
+                copyToClipboard(btn, 'data-diff', btn.closest('tr'), true);
             });
         });
 
@@ -463,7 +481,6 @@ template = '''
         });
 
         const resultsCount = document.getElementById('filter-results-count');
-        const monitoredBranchTags = document.querySelectorAll('#monitored-branches-list .branch-tag');
         const noResults = document.createElement('div');
         noResults.className = 'no-results';
         noResults.textContent = 'No matching branches or conflicts found. ';
@@ -517,6 +534,7 @@ template = '''
 
         filterInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
+            const terms = query.split(/\\s+/).filter(t => t !== '');
             // PALETTE: Save filter to localStorage
             try {
                 localStorage.setItem('smartgit_dashboard_filter', query);
@@ -538,7 +556,8 @@ template = '''
             // PALETTE: First pass - determine visible rows and collect branches from them
             currentTableRows.forEach(row => {
                 const text = row.textContent.toLowerCase();
-                const isVisible = text.includes(query);
+                // PALETTE: AND filtering - all terms must match
+                const isVisible = terms.every(term => text.includes(term));
                 row.style.display = isVisible ? '' : 'none';
                 if (isVisible) {
                     visibleRowsCount++;
@@ -551,10 +570,11 @@ template = '''
             document.querySelectorAll('.branch-tag').forEach(tag => {
                 const branchName = tag.getAttribute('data-branch');
                 const text = branchName.toLowerCase();
-                const isActive = query !== '' && text === query;
-                // PALETTE: Intelligent filtering - show if name matches OR if branch is in a visible conflict
+                // PALETTE: Active if this specific value is one of the filter terms
+                const isActive = terms.some(term => text === term);
+                // PALETTE: Intelligent filtering - show if name matches ALL terms OR if branch is in a visible conflict
                 if (tag.closest('#monitored-branches-list')) {
-                    const matchesQuery = text.includes(query);
+                    const matchesQuery = terms.every(term => text.includes(term));
                     const isInVisibleConflict = visibleBranchesInTable.has(branchName);
                     tag.style.display = (matchesQuery || isInVisibleConflict) ? 'inline-block' : 'none';
                 }
@@ -565,7 +585,7 @@ template = '''
 
             document.querySelectorAll('.scenario-types li, .interactive-badge').forEach(el => {
                 const text = el.getAttribute('data-filter').toLowerCase();
-                const isActive = query !== '' && text === query;
+                const isActive = terms.some(term => text === term);
                 el.classList.toggle('active-filter', isActive);
                 // PALETTE: Sync ARIA state
                 el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
