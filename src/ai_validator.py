@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 import requests
 from src.config_manager import ConfigManager
+from src.guardrails import InputValidator
 
 class ValidationLevel(Enum):
     LOW = "low"
@@ -35,6 +36,7 @@ class AIValidator:
         self.repo_path = repo_path
         self.db_path = os.path.join(repo_path, ".smartgit_tracker.db")
         self._setup_logging()
+        self.input_validator = InputValidator()
         # Load LLM config
         self.config_manager = ConfigManager(repo_path)
         self.llm_config = self.config_manager.get_llm_config()
@@ -447,7 +449,13 @@ class AIValidator:
         ) 
 
     def _call_ollama_llm(self, prompt: str) -> str:
-        """Call local Ollama LLM HTTP API"""
+        """Call local Ollama LLM HTTP API with SSRF protection"""
+        # 🛡️ Sentinel: Validate URL to prevent SSRF (allow local)
+        is_valid, msg = self.input_validator.validate_url(self.ollama_endpoint, allow_local=True)
+        if not is_valid:
+            self.logger.error(f"SSRF Protection: Blocked request to invalid endpoint: {msg}")
+            return "{\"is_valid\": false, \"confidence\": 0.0, \"issues\": [\"Ollama endpoint blocked by SSRF protection\"], \"recommendations\": [\"Review LLM configuration\"]}"
+
         headers = {"Content-Type": "application/json"}
         data = {
             "model": self.ollama_model,
@@ -476,7 +484,13 @@ class AIValidator:
             return "{\"is_valid\": true, \"confidence\": 0.5, \"issues\": [\"Ollama LLM call failed\"], \"recommendations\": [\"Check local Ollama server\"]}"
 
     def _call_mistral_llm(self, prompt: str) -> str:
-        """Call local Mistral LLM HTTP API"""
+        """Call local Mistral LLM HTTP API with SSRF protection"""
+        # 🛡️ Sentinel: Validate URL to prevent SSRF (allow local)
+        is_valid, msg = self.input_validator.validate_url(self.mistral_endpoint, allow_local=True)
+        if not is_valid:
+            self.logger.error(f"SSRF Protection: Blocked request to invalid endpoint: {msg}")
+            return "{\"is_valid\": false, \"confidence\": 0.0, \"issues\": [\"Mistral endpoint blocked by SSRF protection\"], \"recommendations\": [\"Review LLM configuration\"]}"
+
         headers = {"Content-Type": "application/json"}
         data = {
             "model": self.mistral_model,
