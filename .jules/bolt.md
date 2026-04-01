@@ -93,3 +93,7 @@
 ## 2025-08-20 - [O(N) Similarity for Sorted Unique Sequences]
 **Learning:** For sorted unique line sequences (like those produced by `ConflictPredictor`), the LCS ratio calculated by `difflib.SequenceMatcher.ratio()` is mathematically equivalent to the set intersection ratio ($2 \times \text{len}(A \cap B) / (\text{len}(A) + \text{len}(B))$). Replacing the $O(N^2)$ sequence matcher with $O(N)$ set operations yields a massive performance boost (~37x for 1000 lines) while maintaining exact correctness. This assumes that sequence order is preserved by sorting and uniqueness is guaranteed by the data structure (e.g. `set` to `sorted tuple`).
 **Action:** Use set-based ratios for similarity checks on pre-processed collections where sequence order is implicitly handled. Always maintain `issubset` as a faster $O(\text{min}(N, M))$ fast-path for high-similarity/identity detection.
+
+## 2025-08-25 - [Lazy Loading for Heavy CV Dependencies]
+**Learning:** Heavy optional dependencies like `cv2`, `mediapipe`, and `face_recognition` introduce significant CLI startup latency and can cause `ImportError` in minimal environments. Deferring these imports to the specific methods where they are used and using a lazy initialization pattern for dependent components ensures the core application remains fast and portable.
+**Action:** Always use lazy imports for heavy or optional third-party libraries. Implement a `_ensure_x_initialized` pattern for components that require expensive one-time setup (like CV cascades) to defer overhead until the first actual use.
