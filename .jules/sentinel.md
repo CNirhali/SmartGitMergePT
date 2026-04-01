@@ -129,3 +129,8 @@
 **Vulnerability:** `InputValidator._is_internal_ip` could be bypassed using 6to4 (`2002::/16`) and Teredo (`2001:0::/32`) IPv6 addresses which encapsulate internal IPv4 addresses.
 **Learning:** Standard IP range checks (like `is_private` or `is_global`) on the top-level IPv6 address do not automatically inspect embedded IPv4 addresses used in transition protocols, allowing attackers to reach internal IPv4 services via IPv6.
 **Prevention:** Explicitly detect addresses within 6to4 and Teredo ranges, extract the embedded IPv4 address (handling Teredo's XOR obfuscation), and recursively validate it against internal/private IP ranges.
+
+## 2026-03-31 - [SSRF Protection with Selective Loopback Allowance]
+**Vulnerability:** `InputValidator.validate_url` with `allow_local=True` bypassed all internal/private IP checks, potentially exposing sensitive internal services or cloud metadata (169.254.169.254) when only local LLM access (localhost) was intended.
+**Learning:** A binary "allow local" flag can be too coarse. If it simply skips all internal IP checks, it opens the door to the entire internal network. Furthermore, a naive implementation of this restriction can accidentally block all public IPs when the flag is enabled.
+**Prevention:** Implement a dedicated `_is_loopback_ip` check that handles IPv4, IPv6, and mapped formats. When `allow_local` is enabled, only permit internal IPs if they are specifically loopback addresses. Ensure this restriction only applies to internal IPs so public routable IPs remain accessible.
