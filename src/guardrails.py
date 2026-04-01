@@ -247,8 +247,10 @@ class InputValidator:
                 return False, "Null byte detected in hostname after decoding"
 
             # Check for literal loopback/private hostnames
-            if not allow_local and normalized_hostname in {'localhost', 'loopback', 'localhost.localdomain'}:
-                return False, "Local URL not allowed"
+            if normalized_hostname in {'localhost', 'loopback', 'localhost.localdomain'}:
+                if not allow_local:
+                    return False, "Local URL not allowed"
+                # If allow_local is True, these are permitted as they resolve to loopback
 
             # Handle IP-based hostnames for robust SSRF protection
             try:
@@ -261,8 +263,10 @@ class InputValidator:
                     ip_str = ip_str.split('%', 1)[0]
 
                 ip = ipaddress.ip_address(ip_str)
-                if not allow_local and self._is_internal_ip(ip):
-                    return False, f"Internal IP not allowed: {ip}"
+                # 🛡️ Sentinel: Refined SSRF protection. If the IP is internal, it's only allowed if it's loopback AND allow_local is True.
+                if self._is_internal_ip(ip):
+                    if not (allow_local and self._is_loopback_ip(ip)):
+                        return False, f"Internal IP not allowed: {ip}"
 
             except ValueError:
                 # 🛡️ Sentinel: Check for integer-based IPv4 (decimal, hex, octal) for robust SSRF protection
@@ -272,8 +276,9 @@ class InputValidator:
                         ip_int = int(normalized_hostname, 0)
                         if 0 <= ip_int <= 0xFFFFFFFF:
                             ip = ipaddress.IPv4Address(ip_int)
-                            if not allow_local and self._is_internal_ip(ip):
-                                return False, f"Internal IP (integer) not allowed: {ip}"
+                            if self._is_internal_ip(ip):
+                                if not (allow_local and self._is_loopback_ip(ip)):
+                                    return False, f"Internal IP (integer) not allowed: {ip}"
                 except (ValueError, OverflowError):
                     pass
 
@@ -283,8 +288,9 @@ class InputValidator:
                     packed_ip = socket.inet_aton(normalized_hostname)
                     ip_str = socket.inet_ntoa(packed_ip)
                     ip = ipaddress.ip_address(ip_str)
-                    if not allow_local and self._is_internal_ip(ip):
-                        return False, f"Internal IP (shorthand) not allowed: {ip}"
+                    if self._is_internal_ip(ip):
+                        if not (allow_local and self._is_loopback_ip(ip)):
+                            return False, f"Internal IP (shorthand) not allowed: {ip}"
                 except (socket.error, ValueError):
                     # Hostname is truly not an IP or invalid IP
                     pass
@@ -292,6 +298,26 @@ class InputValidator:
             return True, url
         except Exception as e:
             return False, f"URL validation error: {str(e)}"
+
+    def _is_loopback_ip(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
+        """🛡️ Sentinel: Specifically check if an IP address is a loopback address, including mapped/compatible IPv6"""
+        if isinstance(ip, ipaddress.IPv6Address):
+            if ip.is_loopback:
+                return True
+
+            if ip.ipv4_mapped:
+                return self._is_loopback_ip(ip.ipv4_mapped)
+
+            # Check for IPv4-compatible IPv6 loopback (::ffff:0:0/96 range with 127.0.0.1)
+            # and ::/96 range for compatible addresses
+            if ip in ipaddress.IPv6Network('::/96'):
+                try:
+                    embedded_v4 = ipaddress.IPv4Address(ip.packed[12:16])
+                    return embedded_v4.is_loopback
+                except:
+                    pass
+
+        return ip.is_loopback
 
     def _is_internal_ip(self, ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
         """Check if an IP address belongs to an internal or reserved range, including IPv4-mapped/compatible IPv6"""
