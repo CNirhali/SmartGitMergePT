@@ -1,9 +1,3 @@
-import cv2
-import numpy as np
-import pyautogui
-import psutil
-import face_recognition
-import mediapipe as mp
 import sqlite3
 import json
 import logging
@@ -52,10 +46,11 @@ class AgenticTracker:
         self._setup_database()
         self._setup_logging()
         
-        # Initialize tracking components
-        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        self.mp_face_detection = mp.solutions.face_detection
-        self.face_detection = self.mp_face_detection.FaceDetection(min_detection_confidence=0.7)
+        # Initialize tracking components (lazy)
+        self.face_cascade = None
+        self.mp_face_detection = None
+        self.face_detection = None
+        self._cv_initialized = None
         
         # Tracking state
         self.current_session: Optional[WorkSession] = None
@@ -146,6 +141,12 @@ class AgenticTracker:
     
     def _load_known_faces(self):
         """Load known face encodings from database"""
+        try:
+            import numpy as np
+        except ImportError:
+            self.logger.error("numpy not available for loading known faces")
+            return
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('SELECT developer_id, face_encoding, name FROM known_faces')
@@ -161,6 +162,12 @@ class AgenticTracker:
     
     def register_developer(self, developer_id: str, name: str, face_image_path: str):
         """Register a new developer with their face encoding"""
+        try:
+            import face_recognition
+        except ImportError:
+            self.logger.error("face_recognition not available for registering developer")
+            raise ImportError("face_recognition library is required for developer registration")
+
         # Validate face_image_path for path traversal (using realpath to resolve symlinks)
         abs_repo_path = os.path.realpath(self.repo_path)
         full_image_path = os.path.realpath(os.path.join(abs_repo_path, face_image_path))
@@ -267,6 +274,7 @@ class AgenticTracker:
     def _capture_screen_activity(self):
         """Capture and analyze screen activity"""
         try:
+            import pyautogui
             # Take screenshot
             screenshot = pyautogui.screenshot()
             screenshot_path = self._save_screenshot(screenshot)
@@ -298,6 +306,7 @@ class AgenticTracker:
     def _capture_webcam_activity(self):
         """Capture and analyze webcam activity"""
         try:
+            import cv2
             cap = cv2.VideoCapture(0)
             if not cap.isOpened():
                 self.logger.warning("Could not open webcam")
@@ -334,15 +343,45 @@ class AgenticTracker:
         except Exception as e:
             self.logger.error(f"Error capturing webcam activity: {e}")
     
+    def _ensure_cv_initialized(self) -> bool:
+        """Lazy initialization of CV components"""
+        if self._cv_initialized is not None:
+            return self._cv_initialized
+
+        try:
+            import cv2
+            import mediapipe as mp
+            self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            self.mp_face_detection = mp.solutions.face_detection
+            self.face_detection = self.mp_face_detection.FaceDetection(min_detection_confidence=0.7)
+            self._cv_initialized = True
+            return True
+        except ImportError as e:
+            self.logger.error(f"Failed to initialize CV components (ImportError): {e}")
+            self._cv_initialized = False
+            return False
+        except Exception as e:
+            self.logger.error(f"Unexpected error initializing CV components: {e}")
+            self._cv_initialized = False
+            return False
+
     def _detect_faces(self, frame) -> bool:
         """Detect faces in webcam frame"""
+        if not self._ensure_cv_initialized():
+            return False
+
+        import cv2
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.face_detection.process(rgb_frame)
         return len(results.detections) > 0 if results.detections else False
     
     def _blur_faces_in_frame(self, frame):
         """Blur detected faces in the frame for privacy"""
+        if not self._ensure_cv_initialized():
+            return frame
+
         try:
+            import cv2
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = self.face_detection.process(rgb_frame)
 
@@ -372,6 +411,12 @@ class AgenticTracker:
 
     def _identify_developer(self, frame) -> Optional[str]:
         """Identify developer from face recognition"""
+        try:
+            import cv2
+            import face_recognition
+        except ImportError:
+            return None
+
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(rgb_frame)
         face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
@@ -388,6 +433,11 @@ class AgenticTracker:
     
     def _analyze_screen_content(self, screenshot) -> float:
         """Analyze screenshot for coding activity"""
+        try:
+            import numpy as np
+        except ImportError:
+            return 0.0
+
         # Convert to numpy array
         img_array = np.array(screenshot)
         
@@ -433,6 +483,11 @@ class AgenticTracker:
     
     def _save_webcam_image(self, frame) -> str:
         """Save webcam image to disk with restrictive permissions"""
+        try:
+            import cv2
+        except ImportError:
+            return ""
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"webcam_{timestamp}.png"
         dir_path = os.path.join(self.repo_path, "tracking_data", "webcam")
