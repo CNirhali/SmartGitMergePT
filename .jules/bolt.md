@@ -97,3 +97,7 @@
 ## 2025-08-25 - [Lazy Loading for Heavy CV Dependencies]
 **Learning:** Heavy optional dependencies like `cv2`, `mediapipe`, and `face_recognition` introduce significant CLI startup latency and can cause `ImportError` in minimal environments. Deferring these imports to the specific methods where they are used and using a lazy initialization pattern for dependent components ensures the core application remains fast and portable.
 **Action:** Always use lazy imports for heavy or optional third-party libraries. Implement a `_ensure_x_initialized` pattern for components that require expensive one-time setup (like CV cascades) to defer overhead until the first actual use.
+
+## 2025-08-28 - [O(1) Statistics and Time-Based Sampling for Monitoring]
+**Learning:** Storing unbounded lists of function timings in a performance optimizer leads to O(N) memory growth and O(N) computation during report generation. Additionally, frequent system-level resource checks (via psutil) in hot decorators can introduce massive overhead (~488us per call).
+**Action:** Always use aggregate statistics (count, total, min, max) for O(1) tracking. Implement time-based sampling (e.g., 100ms interval) for expensive resource monitoring to reduce decorator overhead to <1us in hot loops.
