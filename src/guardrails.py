@@ -343,6 +343,11 @@ class InputValidator:
                 ipv4_bytes = bytes([b ^ 0xFF for b in ip.packed[12:16]])
                 return self._is_internal_ip(ipaddress.IPv4Address(ipv4_bytes))
 
+            # 🛡️ Sentinel: Check for ISATAP (RFC 5214 Interface ID starts with 0000:5efe or 0200:5efe)
+            # ISATAP embeds an IPv4 address in the last 32 bits of the 64-bit interface ID.
+            if ip.packed[8:12] in (b'\x00\x00\x5e\xfe', b'\x02\x00\x5e\xfe'):
+                return self._is_internal_ip(ipaddress.IPv4Address(ip.packed[12:16]))
+
         return (
             ip.is_loopback or
             ip.is_private or
