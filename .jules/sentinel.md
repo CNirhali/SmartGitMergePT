@@ -134,3 +134,8 @@
 **Vulnerability:** `InputValidator.validate_url` with `allow_local=True` bypassed all internal/private IP checks, potentially exposing sensitive internal services or cloud metadata (169.254.169.254) when only local LLM access (localhost) was intended.
 **Learning:** A binary "allow local" flag can be too coarse. If it simply skips all internal IP checks, it opens the door to the entire internal network. Furthermore, a naive implementation of this restriction can accidentally block all public IPs when the flag is enabled.
 **Prevention:** Implement a dedicated `_is_loopback_ip` check that handles IPv4, IPv6, and mapped formats. When `allow_local` is enabled, only permit internal IPs if they are specifically loopback addresses. Ensure this restriction only applies to internal IPs so public routable IPs remain accessible.
+
+## 2026-04-01 - [SSRF Bypass via ISATAP Tunneling]
+**Vulnerability:** `InputValidator._is_internal_ip` could be bypassed using ISATAP (RFC 5214) IPv6 addresses which embed internal IPv4 addresses within a globally routable IPv6 prefix (using interface IDs `0000:5efe` or `0200:5efe`).
+**Learning:** IPv6 transition and tunneling mechanisms allow embedding IPv4 addresses in non-obvious ways. Standard global/private checks on the top-level IPv6 address are insufficient if the underlying system might decapsulate and route to the embedded IPv4.
+**Prevention:** Explicitly inspect the IPv6 interface identifier for ISATAP patterns, extract the embedded IPv4 address from the last 32 bits, and recursively validate it against internal/private IP ranges.

@@ -408,14 +408,26 @@ class PerformanceOptimizer:
         )
         
         # Performance tracking
-        self.function_timings = defaultdict(list)
+        # BOLT: Use aggregate stats instead of unbounded lists to prevent memory leaks and improve efficiency
+        self.function_stats = defaultdict(lambda: {'count': 0, 'total': 0.0, 'min': float('inf'), 'max': 0.0})
         self.optimization_stats = {
             'cache_hits': 0,
             'cache_misses': 0,
             'async_operations': 0,
             'memory_optimizations': 0
         }
+        # BOLT: Resource check sampling to reduce psutil overhead
+        self._last_resource_check = 0.0
+        self._resource_check_interval = 0.1  # 100ms
     
+    def _update_stats(self, func_name: str, duration: float):
+        """BOLT: Internal helper to update function statistics efficiently"""
+        stats = self.function_stats[func_name]
+        stats['count'] += 1
+        stats['total'] += duration
+        if duration < stats['min']: stats['min'] = duration
+        if duration > stats['max']: stats['max'] = duration
+
     def cached_function(self, ttl_seconds: int = 3600):
         """Decorator for caching function results"""
         def decorator(func: Callable) -> Callable:
@@ -434,12 +446,13 @@ class PerformanceOptimizer:
                 self.optimization_stats['cache_misses'] += 1
                 
                 # Execute function and cache result
-                start_time = time.time()
+                # BOLT: Use monotonic() for accurate and efficient interval measurements
+                start_time = time.monotonic()
                 result = func(*args, **kwargs)
-                duration = time.time() - start_time
+                duration = time.monotonic() - start_time
                 
-                # Record timing
-                self.function_timings[func.__name__].append(duration)
+                # Record timing aggregate statistics
+                self._update_stats(func.__name__, duration)
                 
                 # Cache result
                 # BOLT: Pass is_hash=True as _create_cache_key already returns an MD5 hash
@@ -457,12 +470,12 @@ class PerformanceOptimizer:
             async def wrapper(*args, **kwargs):
                 self.optimization_stats['async_operations'] += 1
                 
-                start_time = time.time()
+                start_time = time.monotonic()
                 result = await func(*args, **kwargs)
-                duration = time.time() - start_time
+                duration = time.monotonic() - start_time
                 
-                # Record timing
-                self.function_timings[func.__name__].append(duration)
+                # Record timing aggregate statistics
+                self._update_stats(func.__name__, duration)
                 
                 return result
             
@@ -474,22 +487,27 @@ class PerformanceOptimizer:
         def decorator(func: Callable) -> Callable:
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
-                # Check resource usage before execution
-                memory_healthy, _ = self.resource_manager.check_memory_usage()
-                cpu_healthy, _ = self.resource_manager.check_cpu_usage()
-                
-                # Optimize if needed
-                if not memory_healthy or not cpu_healthy:
-                    self.resource_manager.optimize_memory()
-                    self.optimization_stats['memory_optimizations'] += 1
+                now = time.monotonic()
+                # BOLT: Time-based sampling for resource checks to reduce psutil overhead
+                if now - self._last_resource_check > self._resource_check_interval:
+                    self._last_resource_check = now
+                    # Check resource usage before execution
+                    memory_healthy, _ = self.resource_manager.check_memory_usage()
+                    cpu_healthy, _ = self.resource_manager.check_cpu_usage()
+
+                    # Optimize if needed
+                    if not memory_healthy or not cpu_healthy:
+                        self.resource_manager.optimize_memory()
+                        self.optimization_stats['memory_optimizations'] += 1
                 
                 # Execute function
-                start_time = time.time()
+                # BOLT: Capture start_time AFTER resource checks for timing accuracy
+                start_time = time.monotonic()
                 result = func(*args, **kwargs)
-                duration = time.time() - start_time
+                duration = time.monotonic() - start_time
                 
-                # Record timing
-                self.function_timings[func.__name__].append(duration)
+                # Record timing aggregate statistics
+                self._update_stats(func.__name__, duration)
                 
                 return result
             
@@ -513,14 +531,15 @@ class PerformanceOptimizer:
         resource_stats = self.resource_manager.get_resource_stats()
         
         # Calculate function performance
+        # BOLT: Derived from aggregate statistics for efficiency
         function_stats = {}
-        for func_name, timings in self.function_timings.items():
-            if timings:
+        for func_name, stats in self.function_stats.items():
+            if stats['count'] > 0:
                 function_stats[func_name] = {
-                    'avg_time': sum(timings) / len(timings),
-                    'min_time': min(timings),
-                    'max_time': max(timings),
-                    'call_count': len(timings)
+                    'avg_time': stats['total'] / stats['count'],
+                    'min_time': stats['min'],
+                    'max_time': stats['max'],
+                    'call_count': stats['count']
                 }
         
         return {

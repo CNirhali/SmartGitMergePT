@@ -101,3 +101,6 @@
 ## 2025-09-02 - [Set-Based Fast-Path for String Validation]
 **Learning:** Performing character-by-character validation against a set of blocked characters using a loop is $O(M \times N)$ where $M$ is the number of blocked characters and $N$ is the string length. Using `set.isdisjoint(string)` leverages Python's internal C implementation to perform the same check in $O(N)$, providing a significant (~2.4x) speedup for valid inputs (the common case).
 **Action:** Use `set.isdisjoint()` as a high-performance fast-path for membership-based string validation. Fall back to a loop only if a violation is detected to preserve detailed error reporting.
+## 2025-08-30 - [Aggregate Statistics and Sampled Resource Checks]
+**Learning:** Re-calculating full timing history (O(N)) in decorators and performing expensive resource checks (e.g. `psutil`) on every call introduces significant overhead (~1200us) that can dwarf function execution. Aggregate statistics (O(1) update) and time-based sampling for resource checks reduce this overhead to ~1us while maintaining observability and protection.
+**Action:** Prefer aggregate statistics (count, total, min, max) over unbounded history for performance metrics in high-frequency paths. Implement time-based sampling (e.g. 100ms interval) for expensive system calls in decorators to minimize runtime impact.
