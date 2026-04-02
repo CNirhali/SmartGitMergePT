@@ -105,3 +105,26 @@ def test_validate_url_null_bytes_and_scope_id():
 
     # IPv6 with Scope ID
     assert validator.validate_url("http://[fe80::1%eth0]")[0] is False # fe80::1 is link-local
+
+def test_is_internal_ip_isatap():
+    validator = InputValidator()
+
+    # ISATAP loopback (Cloudflare global unicast prefix + ISATAP interface ID)
+    ip = ipaddress.ip_address('2606:4700:4700::5efe:127.0.0.1')
+    assert validator._is_internal_ip(ip) is True
+
+    # ISATAP private (2001:db8:: + ISATAP interface ID)
+    ip = ipaddress.ip_address('2001:db8::5efe:192.168.0.1')
+    assert validator._is_internal_ip(ip) is True
+
+    # ISATAP link-local (fe80:: + ISATAP interface ID)
+    ip = ipaddress.ip_address('fe80::5efe:10.0.0.1')
+    assert validator._is_internal_ip(ip) is True
+
+    # ISATAP public (2606:4700:4700::5efe:8.8.8.8)
+    ip = ipaddress.ip_address('2606:4700:4700::5efe:8.8.8.8')
+    assert validator._is_internal_ip(ip) is False
+
+    # Modified ISATAP (0200:5efe)
+    ip = ipaddress.ip_address('2001:db8::0200:5efe:127.0.0.1')
+    assert validator._is_internal_ip(ip) is True
