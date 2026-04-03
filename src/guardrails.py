@@ -404,17 +404,30 @@ class InputValidator:
         return html.escape(text)
 
 def ensure_private_file(path: Union[str, Path]):
-    """Ensure a file exists and has restrictive (0o600) permissions"""
+    """Ensure a file exists and has restrictive (0o600) permissions, rejecting symlinks"""
     path = Path(path)
+    if path.is_symlink():
+        raise ValueError(f"Security error: {path} is a symbolic link")
+
     if not path.exists():
-        path.touch()
+        # 🛡️ Sentinel: Securely create file with 0o600 permissions to avoid race conditions
+        try:
+            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(fd)
+        except FileExistsError:
+            pass # Already exists, just ensure permissions
+
     os.chmod(path, 0o600)
 
 def ensure_private_dir(path: Union[str, Path]):
-    """Ensure a directory exists and has restrictive (0o700) permissions"""
+    """Ensure a directory exists and has restrictive (0o700) permissions, rejecting symlinks"""
     path = Path(path)
+    if path.is_symlink():
+        raise ValueError(f"Security error: {path} is a symbolic link")
+
     if not path.exists():
         path.mkdir(parents=True, exist_ok=True)
+
     os.chmod(path, 0o700)
 
 class DataEncryption:

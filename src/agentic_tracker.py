@@ -476,8 +476,9 @@ class AgenticTracker:
         filepath = os.path.join(dir_path, filename)
         
         ensure_private_dir(dir_path)
-        screenshot.save(filepath)
+        # 🛡️ Sentinel: Call ensure_private_file BEFORE saving to ensure 0o600 from start
         ensure_private_file(filepath)
+        screenshot.save(filepath)
         
         return filepath
     
@@ -494,8 +495,9 @@ class AgenticTracker:
         filepath = os.path.join(dir_path, filename)
         
         ensure_private_dir(dir_path)
-        cv2.imwrite(filepath, frame)
+        # 🛡️ Sentinel: Call ensure_private_file BEFORE saving to ensure 0o600 from start
         ensure_private_file(filepath)
+        cv2.imwrite(filepath, frame)
         
         return filepath
     

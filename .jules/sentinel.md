@@ -139,3 +139,8 @@
 **Vulnerability:** `InputValidator._is_internal_ip` could be bypassed using ISATAP (RFC 5214) IPv6 addresses which embed internal IPv4 addresses within a globally routable IPv6 prefix (using interface IDs `0000:5efe` or `0200:5efe`).
 **Learning:** IPv6 transition and tunneling mechanisms allow embedding IPv4 addresses in non-obvious ways. Standard global/private checks on the top-level IPv6 address are insufficient if the underlying system might decapsulate and route to the embedded IPv4.
 **Prevention:** Explicitly inspect the IPv6 interface identifier for ISATAP patterns, extract the embedded IPv4 address from the last 32 bits, and recursively validate it against internal/private IP ranges.
+
+## 2026-04-02 - [Permission Race Condition and Symlink Attack in Private File Handling]
+**Vulnerability:** `ensure_private_file` and `ensure_private_dir` were vulnerable to symbolic link attacks and race conditions. Files were created with default permissions and then chmodded, leaving a window of exposure. Symlinks could also be used to redirect chmod operations to sensitive system files.
+**Learning:** Checking for file existence before creation followed by `os.chmod` is non-atomic and vulnerable to TOCTOU. Using `os.open` with `os.O_CREAT | os.O_EXCL` and a mode argument allows for atomic, secure file creation.
+**Prevention:** Always use atomic creation flags (`O_CREAT | O_EXCL`) with explicit mode bits when creating sensitive files. Explicitly reject symbolic links using `path.is_symlink()` before performing operations that should only target regular files or directories.
