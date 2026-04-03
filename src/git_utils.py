@@ -2,6 +2,11 @@ import git
 from typing import List, Tuple
 
 class GitUtils:
+    # 🛡️ Sentinel: Block dangerous shell metacharacters to prevent command injection via social engineering
+    # These characters are either not allowed in git branch names or pose a risk if pasted into a shell
+    # BOLT: Defined as a class-level constant to avoid repeated set creation.
+    DANGEROUS_BRANCH_CHARS = {';', '&', '|', '$', '(', ')', '`', '>', '<', '\\', "'", '"', '*', '?', '[', ']', '!', '{', '}', '\n', '\r'}
+
     def __init__(self, repo_path: str = "."):
         self.repo = git.Repo(repo_path)
 
@@ -16,12 +21,9 @@ class GitUtils:
         if branch_name.startswith('-'):
             raise ValueError(f"Invalid branch name: {branch_name}. Branch names cannot start with a hyphen.")
 
-        # 🛡️ Sentinel: Block dangerous shell metacharacters to prevent command injection via social engineering
-        # These characters are either not allowed in git branch names or pose a risk if pasted into a shell
         # BOLT: Using isdisjoint() for a ~2.4x speedup on valid branch names (fast-path).
-        dangerous_chars = {';', '&', '|', '$', '(', ')', '`', '>', '<', '\\', "'", '"', '*', '?', '[', ']', '!', '{', '}', '\n', '\r'}
-        if not dangerous_chars.isdisjoint(branch_name):
-            for char in dangerous_chars:
+        if not self.DANGEROUS_BRANCH_CHARS.isdisjoint(branch_name):
+            for char in self.DANGEROUS_BRANCH_CHARS:
                 if char in branch_name:
                     raise ValueError(f"Invalid branch name: {branch_name}. Branch names cannot contain shell metacharacters like '{char}'.")
 
