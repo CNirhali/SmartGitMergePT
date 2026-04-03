@@ -123,33 +123,35 @@ def main():
         # are predicted to have at least one modified file in common.
         # This reduces the number of git calls from O(N^2) to O(Pairs with overlap).
         predictions = predictor.predict_conflicts(branches)
-        candidate_pairs = [p['branches'] for p in predictions]
-        candidate_set = set(tuple(sorted(p)) for p in candidate_pairs)
+        # BOLT: Normalize candidate branch pairs as sorted tuples for robust hash-based lookups.
+        candidate_pairs = [tuple(sorted(p['branches'])) for p in predictions]
 
-        def check_pair(pair):
-            branch_a, branch_b = pair
-            ok, msg = git_utils.simulate_merge(branch_a, branch_b)
-            return (branch_a, branch_b, ok, msg)
+        # BOLT: Only submit candidate branch pairs to the ThreadPoolExecutor to minimize task overhead.
+        results = {}
+        if candidate_pairs:
+            def check_pair(pair):
+                branch_a, branch_b = pair
+                ok, msg = git_utils.simulate_merge(branch_a, branch_b)
+                return (pair, ok, msg)
+
+            with ThreadPoolExecutor() as executor:
+                for pair, ok, msg in executor.map(check_pair, candidate_pairs):
+                    results[pair] = (ok, msg)
 
         # To maintain original output behavior (listing "No conflict" for all),
-        # we generate all pairs but skip simulation for non-candidates.
-        all_pairs = []
+        # we iterate through all possible pairs and use simulation results if available.
         for i, branch_a in enumerate(branches):
             for branch_b in branches[i+1:]:
-                all_pairs.append((branch_a, branch_b))
-
-        with ThreadPoolExecutor() as executor:
-            # For candidate pairs, run simulation. For others, skip and report OK.
-            def optimized_check(pair):
-                if tuple(sorted(pair)) in candidate_set:
-                    return check_pair(pair)
-                return (pair[0], pair[1], True, "No shared files modified.")
-
-            for branch_a, branch_b, ok, msg in executor.map(optimized_check, all_pairs):
-                if not ok:
-                    print(f"Conflict detected merging {branch_a} into {branch_b}: {msg}")
+                # BOLT: Check if this pair was simulated. ConflictPredictor already uses sorted pairs.
+                pair_key = (branch_a, branch_b) if branch_a < branch_b else (branch_b, branch_a)
+                if pair_key in results:
+                    ok, msg = results[pair_key]
+                    if not ok:
+                        print(f"Conflict detected merging {branch_a} into {branch_b}: {msg}")
+                    else:
+                        print(f"No conflict merging {branch_a} into {branch_b}.")
                 else:
-                    print(f"No conflict merging {branch_a} into {branch_b}.")
+                    print(f"No conflict merging {branch_a} into {branch_b}. (No shared files modified)")
 
     elif args.command == 'resolve':
         print("Paste the merge conflict block (end with EOF / Ctrl-D):")

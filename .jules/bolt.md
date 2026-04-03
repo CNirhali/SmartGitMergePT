@@ -104,3 +104,7 @@
 ## 2025-08-30 - [Aggregate Statistics and Sampled Resource Checks]
 **Learning:** Re-calculating full timing history (O(N)) in decorators and performing expensive resource checks (e.g. `psutil`) on every call introduces significant overhead (~1200us) that can dwarf function execution. Aggregate statistics (O(1) update) and time-based sampling for resource checks reduce this overhead to ~1us while maintaining observability and protection.
 **Action:** Prefer aggregate statistics (count, total, min, max) over unbounded history for performance metrics in high-frequency paths. Implement time-based sampling (e.g. 100ms interval) for expensive system calls in decorators to minimize runtime impact.
+
+## 2025-09-05 - [Optimizing Parallel Conflict Detection and Branch Validation]
+**Learning:** Submitting thousands of tasks to a 'ThreadPoolExecutor' for non-conflicting branch pairs (O(N^2)) creates significant management overhead even if the tasks are fast. Pre-filtering pairs based on modified file overlap reduces complexity to O(overlapping pairs) and measurably improves performance. Additionally, moving constant set creation (like blocked characters) out of validation loops to class-level attributes avoids redundant allocations. Micro-optimizations like manual slicing for prefix checks are often negligible in modern Python and should be rejected if they compromise readability.
+**Action:** Always pre-filter O(N^2) parallel task submissions. Move static data structures to class/module scope. Prioritize readability over negligible micro-optimizations.
