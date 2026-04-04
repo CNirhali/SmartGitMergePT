@@ -37,9 +37,6 @@ class ConflictPredictor:
 
         cached_data = self.cache.get(cache_key, is_hash=True)
         if cached_data:
-            # BOLT: Ensure lazy cache is present for legacy cached entries
-            if 'sorted_lines' not in cached_data:
-                cached_data['sorted_lines'] = {}
             return branch, cached_data
 
         if branch == main_branch:
@@ -61,25 +58,10 @@ class ConflictPredictor:
             # BOLT: Removed large 'diff' string to save memory and I/O
             'files': files,
             'lines': lines,
-            # BOLT: Pre-initialize lazy cache to avoid setdefault() overhead in hot loops
-            'sorted_lines': {},
             'commit': commit_hash
         }
         self.cache.set(cache_key, data, is_hash=True)
         return branch, data
-
-    def _get_lazy_sorted_lines(self, data: Dict, file: str) -> Tuple[str, ...]:
-        """BOLT: Lazily calculate and memoize sorted lines in branch_data.
-        Returns a tuple of lines instead of a joined string to speed up SequenceMatcher.
-        """
-        # BOLT: Using direct access as 'sorted_lines' is now pre-initialized
-        cache = data['sorted_lines']
-        try:
-            return cache[file]
-        except KeyError:
-            # BOLT: data['lines'][file] is already a set, so sorted() is efficient
-            val = cache[file] = tuple(sorted(data['lines'].get(file, [])))
-            return val
 
     def predict_conflicts(self, branches: List[str]) -> List[Dict]:
         predictions = []
@@ -143,67 +125,39 @@ class ConflictPredictor:
             for file in data['files']:
                 file_to_branches[file].append(branch)
 
-        # BOLT: Only check pairs of branches that actually share at least one modified file
-        seen_pairs = set()
+        # BOLT: Accumulate file overlaps across pairs incrementally.
+        # This avoids redundant O(F) set intersections and seen_pairs overhead.
+        pair_overlaps = collections.defaultdict(set)
         for common_file, sharers in file_to_branches.items():
             for i, branch_a in enumerate(sharers):
                 for branch_b in sharers[i+1:]:
                     # BOLT: Faster pair creation without sorted()
                     pair = (branch_a, branch_b) if branch_a < branch_b else (branch_b, branch_a)
-                    if pair in seen_pairs:
-                        continue
-                    seen_pairs.add(pair)
+                    pair_overlaps[pair].add(common_file)
 
-                    data_a = branch_data[branch_a]
-                    data_b = branch_data[branch_b]
+        # BOLT: Process pairs with confirmed overlaps
+        for pair, overlap in pair_overlaps.items():
+            branch_a, branch_b = pair
+            data_a = branch_data[branch_a]
+            data_b = branch_data[branch_b]
 
-                    # Recalculate full overlap for this specific pair
-                    overlap = data_a['files'] & data_b['files']
+            # BOLT: Only check line-level overlap for files that both branches modified
+            # Use isdisjoint() for O(min(len_a, len_b)) and early exit.
+            # NOTE: Semantic similarity logic is removed as it's mathematically redundant
+            # with the current set-based line overlap check when no exact matches exist.
+            line_conflicts = False
+            for common_f in overlap:
+                if not data_a['lines'][common_f].isdisjoint(data_b['lines'][common_f]):
+                    line_conflicts = True
+                    break
 
-                    # BOLT: Using pre-calculated line sets per file
-                    # Only check line-level overlap for files that both branches modified
-                    # BOLT: Use isdisjoint() for O(min(len_a, len_b)) and early exit
-                    line_conflicts = False
-                    for common_f in overlap:
-                        if not data_a['lines'][common_f].isdisjoint(data_b['lines'][common_f]):
-                            line_conflicts = True
-                            break
-
-                    # BOLT: Semantic similarity is slow, only check if there's no line overlap
-                    # but files still overlap. Optimized to only compare overlapping file content.
-                    semantic_conflict = False
-                    if not line_conflicts:
-                        # Use commit hashes in cache key for semantic similarity
-                        sim_key_raw = f"sim:{data_a['commit']}:{data_b['commit']}"
-                        # BOLT: Pre-calculate hash to avoid triple-hashing
-                        sim_key = hashlib.md5(sim_key_raw.encode()).hexdigest()
-
-                        cached_sim = self.cache.get(sim_key, is_hash=True)
-                        if cached_sim is not None:
-                            semantic_conflict = cached_sim
-                        else:
-                            # BOLT: Check similarity file-by-file for early exit and smaller SequenceMatcher inputs
-                            # This provides a massive win for large multi-file diffs.
-                            for common_f in overlap:
-                                content_a = self._get_lazy_sorted_lines(data_a, common_f)
-                                content_b = self._get_lazy_sorted_lines(data_b, common_f)
-                                # BOLT: Pass pre-calculated line sets to avoid redundant set creation in fast-path
-                                if self._semantic_similarity(content_a, content_b,
-                                                            data_a['lines'][common_f],
-                                                            data_b['lines'][common_f]):
-                                    semantic_conflict = True
-                                    break
-
-                            self.cache.set(sim_key, semantic_conflict, is_hash=True)
-
-                    if overlap or line_conflicts or semantic_conflict:
-                        predictions.append({
-                            'branches': pair,
-                            'files': list(overlap),
-                            'line_conflicts': line_conflicts,
-                            'semantic_conflict': semantic_conflict,
-                            'conflict_likely': True
-                        })
+            predictions.append({
+                'branches': pair,
+                'files': list(overlap),
+                'line_conflicts': line_conflicts,
+                'semantic_conflict': False, # Redundant for line atoms
+                'conflict_likely': True
+            })
         return predictions
 
     def _get_diff_metadata(self, diff: str, skip_lines: bool = False) -> Tuple[Set[str], Dict[str, Set[str]]]:
