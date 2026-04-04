@@ -144,3 +144,8 @@
 **Vulnerability:** `ensure_private_file` and `ensure_private_dir` were vulnerable to symbolic link attacks and race conditions. Files were created with default permissions and then chmodded, leaving a window of exposure. Symlinks could also be used to redirect chmod operations to sensitive system files.
 **Learning:** Checking for file existence before creation followed by `os.chmod` is non-atomic and vulnerable to TOCTOU. Using `os.open` with `os.O_CREAT | os.O_EXCL` and a mode argument allows for atomic, secure file creation.
 **Prevention:** Always use atomic creation flags (`O_CREAT | O_EXCL`) with explicit mode bits when creating sensitive files. Explicitly reject symbolic links using `path.is_symlink()` before performing operations that should only target regular files or directories.
+
+## 2026-04-03 - [Percent-Encoding Bypass in Input Validation]
+**Vulnerability:** InputValidator was vulnerable to bypasses of its security regexes (SQLi, Path Traversal, Dangerous Protocols) if the input was percent-encoded.
+**Learning:** Security filters often operate on raw strings, but downstream components or browsers may decode percent-encoded data, allowing malicious payloads to evade initial detection.
+**Prevention:** Always normalize input by unquoting it before applying security filters and regex checks. Validate both the raw and normalized versions for defense-in-depth.
