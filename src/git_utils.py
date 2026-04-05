@@ -5,7 +5,7 @@ class GitUtils:
     # 🛡️ Sentinel: Block dangerous shell metacharacters to prevent command injection via social engineering
     # These characters are either not allowed in git branch names or pose a risk if pasted into a shell
     # BOLT: Defined as a class-level constant to avoid repeated set creation.
-    DANGEROUS_BRANCH_CHARS = {';', '&', '|', '$', '(', ')', '`', '>', '<', '\\', "'", '"', '*', '?', '[', ']', '!', '{', '}', '\n', '\r'}
+    DANGEROUS_BRANCH_CHARS = {';', '&', '|', '$', '(', ')', '`', '>', '<', '\\', "'", '"', '*', '?', '[', ']', '!', '{', '}', '\n', '\r', ' ', ':'}
 
     def __init__(self, repo_path: str = "."):
         self.repo = git.Repo(repo_path)
