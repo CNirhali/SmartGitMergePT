@@ -174,15 +174,22 @@ class InputValidator:
         if '\0' in value:
             return False, "Null byte detected in input"
         
+        # 🛡️ Sentinel: Check both raw and unquoted versions to catch percent-encoded bypasses
+        unquoted_value = unquote(value)
+
         # BOLT: Use pre-compiled combined regex for high-performance security check
-        if self._combined_security_re.search(value):
+        if self._combined_security_re.search(value) or self._combined_security_re.search(unquoted_value):
             # If hit, do individual checks to return specific error messages
-            if self._sensitive_re.search(value):
+            if self._sensitive_re.search(value) or self._sensitive_re.search(unquoted_value):
                 return False, "Sensitive data detected in input"
-            if self._path_traversal_re.search(value):
+            if self._path_traversal_re.search(value) or self._path_traversal_re.search(unquoted_value):
                 return False, "Path traversal attempt detected"
-            if self._sql_injection_re.search(value):
+            if self._sql_injection_re.search(value) or self._sql_injection_re.search(unquoted_value):
                 return False, "SQL injection attempt detected"
+
+        # 🛡️ Sentinel: Also check for dangerous protocols in strings
+        if self._dangerous_protocol_re.search(value) or self._dangerous_protocol_re.search(unquoted_value):
+            return False, "Dangerous protocol detected in input"
         
         # Sanitize HTML if not allowed
         if not allow_html:
@@ -221,8 +228,8 @@ class InputValidator:
             if '\0' in url:
                 return False, "Null byte detected in URL"
 
-            # 🛡️ Sentinel: Use pre-compiled regex for robust protocol detection (e.g. j a v a s c r i p t :)
-            if self._dangerous_protocol_re.search(url):
+            # 🛡️ Sentinel: Check both raw and unquoted URL for robust protocol detection (e.g. j a v a s c r i p t :)
+            if self._dangerous_protocol_re.search(url) or self._dangerous_protocol_re.search(unquote(url)):
                 return False, "Dangerous URL protocol detected"
 
             parsed = urlparse(url)
@@ -378,8 +385,8 @@ class InputValidator:
             if not re.search(r'[jvdgfplJVDGFPL]', text):
                 return html.escape(text)
 
-            # 🛡️ Sentinel: Use the pre-compiled regex for fast-path check as well
-            if not self._dangerous_protocol_re.search(text):
+            # 🛡️ Sentinel: Use the pre-compiled regex for fast-path check on both raw and unquoted text
+            if not self._dangerous_protocol_re.search(text) and not self._dangerous_protocol_re.search(unquote(text)):
                 # If no tags and no dangerous protocols, we only need html.escape for safety
                 return html.escape(text)
 

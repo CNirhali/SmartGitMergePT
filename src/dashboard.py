@@ -107,6 +107,10 @@ template = '''
         .summary-item:hover { border-color: #0969da; background-color: #f3f4f6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .summary-item:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
         .summary-item:active { transform: translateY(0); }
+        .summary-item { background: #f6f8fa; padding: 12px 20px; border-radius: 8px; border: 1px solid #d0d7de; transition: all 0.2s; cursor: pointer; user-select: none; }
+        .summary-item:hover { background-color: #f3f4f6; border-color: #afb8c1; }
+        .summary-item:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
+        .summary-item:active { background-color: #ebecf0; transform: translateY(1px); }
         .conflict-yes { color: #cf222e; font-weight: 600; }
         .conflict-no { color: #57606a; }
         .skip-link {
@@ -182,12 +186,17 @@ template = '''
         <span id="filter-results-count" aria-live="polite"></span>
     </div>
     <div id="announcer" class="sr-only" aria-live="polite"></div>
+    <div class="timestamp" style="margin-top: 0.5em;">Shortcuts: <kbd>/</kbd> focus, <kbd>Esc</kbd> clear, <kbd>r</kbd> refresh</div>
 
     <div class="summary">
         <div class="summary-item" role="button" tabindex="0" aria-label="Jump to Monitored Branches ({{ branches|length }} total)" onclick="document.getElementById('branches-section').scrollIntoView({ behavior: 'smooth' })" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('branches-section').scrollIntoView({ behavior: 'smooth' })}">
             <strong>Branches</strong>: {{ branches|length }}
         </div>
         <div class="summary-item" role="button" tabindex="0" aria-label="Jump to Predicted Conflicts ({{ predictions|length }} found)" onclick="document.getElementById('conflicts-section').scrollIntoView({ behavior: 'smooth' })" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('conflicts-section').scrollIntoView({ behavior: 'smooth' })}">
+        <div class="summary-item" id="summary-branches" role="button" tabindex="0" aria-label="Show all branches and clear filter">
+            <strong>Branches</strong>: {{ branches|length }}
+        </div>
+        <div class="summary-item" id="summary-conflicts" role="button" tabindex="0" aria-label="Filter by predicted conflicts">
             <strong>Conflict Pairs</strong>:
             <span class="badge {{ 'badge-error' if predictions else 'badge-success' }}" aria-label="{{ predictions|length }} conflicts detected">
                 {{ predictions|length }}
@@ -237,6 +246,7 @@ template = '''
             {% set is_base_b = pred['branches'][1] == main_branch %}
             <tr data-branch-a="{{ pred['branches'][0] }}" data-branch-b="{{ pred['branches'][1] }}" data-scenarios="{{ 'file_overlap' if pred.get('files') }} {{ 'line_overlap' if pred.get('line_conflicts') }} {{ 'semantic_conflict' if pred.get('semantic_conflict') }}">
                 <td>
+                    <span class="sr-only">predicted conflicts</span>
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                         <div>
                             <span class="branch-tag {{ 'base-branch' if is_base_a }}" role="button" tabindex="0" aria-pressed="false" aria-label="Filter and copy branch name: {{ pred['branches'][0] }}{{ ' (base branch)' if is_base_a }}" title="Filter and copy" data-branch="{{ pred['branches'][0] }}">{{ pred['branches'][0] }}{% if is_base_a %} <small aria-hidden="true">(base)</small>{% endif %}</span>
@@ -659,8 +669,39 @@ template = '''
             }
             relativeEl.textContent = text;
         }
-        setInterval(updateRelativeTime, 30000);
+        setInterval(updateRelativeTime, 10000);
         updateRelativeTime();
+
+        const summaryBranches = document.getElementById('summary-branches');
+        const summaryConflicts = document.getElementById('summary-conflicts');
+
+        if (summaryBranches) {
+            summaryBranches.addEventListener('click', () => {
+                filterInput.value = '';
+                filterInput.dispatchEvent(new Event('input'));
+                filterInput.focus();
+            });
+            summaryBranches.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    summaryBranches.click();
+                }
+            });
+        }
+
+        if (summaryConflicts) {
+            summaryConflicts.addEventListener('click', () => {
+                filterInput.value = 'predicted conflicts';
+                filterInput.dispatchEvent(new Event('input'));
+                filterInput.focus();
+            });
+            summaryConflicts.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    summaryConflicts.click();
+                }
+            });
+        }
 
         document.addEventListener('keydown', (e) => {
             if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== filterInput) {
