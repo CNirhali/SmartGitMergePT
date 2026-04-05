@@ -58,6 +58,10 @@
 **Learning:** Browser-native focus behavior can often reset the cursor position *after* a standard `focus` event listener executes, negating a simple `.select()` call. Using `setTimeout(..., 0)` or `requestAnimationFrame` ensures the selection logic runs after the browser's default positioning, providing a much more reliable "select-on-focus" experience.
 **Action:** Always wrap `.select()` calls in a `setTimeout(() => ..., 0)` when triggered by a `focus` or `click` event to ensure reliability across all browsers.
 
+## 2026-04-05 - [Summary-Driven Interactive Filtering]
+**Learning:** Summary statistics (e.g., "Conflict Pairs: 1") are high-intent elements that users naturally want to interact with. Converting these into buttons that pre-fill a global filter provides an intuitive "drill-down" mechanism that reduces cognitive load and improves navigation speed without adding new UI components.
+**Action:** When implementing summary badges or cards, always add `role="button"` and link them to the primary filtering or search logic to satisfy user curiosity and intent.
+
 ## 2026-03-30 - [Consistency and CSP-Compliant Dynamic Content]
 **Learning:** UX consistency across similar UI elements (like branch vs. file tags) reduces user surprise. When creating dynamic UI elements in a dashboard with a strict Content Security Policy (CSP), using `innerHTML` with strings containing tags (like `<kbd>`) can trigger "Unexpected identifier" errors or policy violations.
 **Action:** Always prioritize functional consistency for interactive tags. Use `document.createElement` and `textContent` instead of `innerHTML` for CSP-compliant dynamic content generation.
