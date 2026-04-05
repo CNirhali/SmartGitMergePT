@@ -103,7 +103,10 @@ template = '''
         .copy-tooltip.show { opacity: 1; }
         kbd { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 3px; box-shadow: inset 0 -1px 0 #d0d7de; color: #24292f; font-family: ui-monospace, monospace; font-size: 11px; padding: 3px 5px; margin-left: 4px; }
         .summary { display: flex; gap: 1em; margin: 1.5em 0; }
-        .summary-item { background: #f6f8fa; padding: 12px 20px; border-radius: 8px; border: 1px solid #d0d7de; }
+        .summary-item { background: #f6f8fa; padding: 12px 20px; border-radius: 8px; border: 1px solid #d0d7de; cursor: pointer; transition: all 0.2s; user-select: none; }
+        .summary-item:hover { border-color: #0969da; background-color: #f3f4f6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .summary-item:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
+        .summary-item:active { transform: translateY(0); }
         .conflict-yes { color: #cf222e; font-weight: 600; }
         .conflict-no { color: #57606a; }
         .skip-link {
@@ -181,10 +184,10 @@ template = '''
     <div id="announcer" class="sr-only" aria-live="polite"></div>
 
     <div class="summary">
-        <div class="summary-item">
+        <div class="summary-item" role="button" tabindex="0" aria-label="Jump to Monitored Branches ({{ branches|length }} total)" onclick="document.getElementById('branches-section').scrollIntoView({ behavior: 'smooth' })" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('branches-section').scrollIntoView({ behavior: 'smooth' })}">
             <strong>Branches</strong>: {{ branches|length }}
         </div>
-        <div class="summary-item">
+        <div class="summary-item" role="button" tabindex="0" aria-label="Jump to Predicted Conflicts ({{ predictions|length }} found)" onclick="document.getElementById('conflicts-section').scrollIntoView({ behavior: 'smooth' })" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('conflicts-section').scrollIntoView({ behavior: 'smooth' })}">
             <strong>Conflict Pairs</strong>:
             <span class="badge {{ 'badge-error' if predictions else 'badge-success' }}" aria-label="{{ predictions|length }} conflicts detected">
                 {{ predictions|length }}
@@ -192,7 +195,7 @@ template = '''
         </div>
     </div>
 
-    <h2>Monitored Branches</h2>
+    <h2 id="branches-section">Monitored Branches</h2>
     <ul id="monitored-branches-list">
     {% for branch in branches %}
         {% set conflict_count = conflicting_branches.get(branch, 0) %}
@@ -217,7 +220,7 @@ template = '''
         </li>
     </ul>
 
-    <h2>Predicted Conflicts</h2>
+    <h2 id="conflicts-section">Predicted Conflicts</h2>
     {% if predictions %}
     <table aria-label="Predicted merge conflicts">
         <thead>
