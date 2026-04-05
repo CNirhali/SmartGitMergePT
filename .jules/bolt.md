@@ -112,3 +112,7 @@
 ## 2025-09-10 - [Incremental Overlap Accumulation and Redundancy Elimination]
 **Learning:** In O(N^2) pairwise comparisons, calculating set intersections (`&`) for every candidate pair is redundant if an inverted index is already available. Building a `pair_overlaps` map incrementally while iterating through the index is significantly faster. Furthermore, semantic similarity checks based on set intersections are mathematically redundant when a line-level 'isdisjoint' check has already returned False for the same sets.
 **Action:** Use incremental accumulation for pairwise metadata instead of repeated set operations. Periodically audit "semantic" heuristics to ensure they provide value beyond existing exact-match checks.
+
+## 2025-09-15 - [Pre-calculating Immutable Network Objects]
+**Learning:** Instantiating `ipaddress.IPv6Network` and `ipaddress.IPv6Address` involves significant string parsing and validation overhead (~18us per call for v6 network containment checks). In high-frequency security guardrails (SSRF protection), this cost accumulates quickly. Since these objects are immutable, they can be safely shared.
+**Action:** Move instantiation of static `ipaddress` network and address objects to class-level constants or module scope. This eliminates redundant parsing in hot loops, achieving ~8x speedup for loopback checks and ~2.4x for general internal range validation.

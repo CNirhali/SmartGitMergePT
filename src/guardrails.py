@@ -112,6 +112,13 @@ class RateLimiter:
 class InputValidator:
     """Comprehensive input validation and sanitization"""
     
+    # BOLT: Pre-calculate network objects to avoid redundant O(N) overhead in hot loops
+    _IPV6_LOOPBACK = ipaddress.IPv6Address('::1')
+    _IPV6_UNSPECIFIED = ipaddress.IPv6Address('::')
+    _IPV6_COMPAT_NET = ipaddress.IPv6Network('::/96')
+    _IPV6_6TO4_NET = ipaddress.IPv6Network('2002::/16')
+    _IPV6_TEREDO_NET = ipaddress.IPv6Network('2001:0::/32')
+
     def __init__(self):
         # BOLT: Pre-compile and combine patterns for performance
         # Using a single combined regex reduces re.search calls from N to 1
@@ -317,7 +324,8 @@ class InputValidator:
 
             # Check for IPv4-compatible IPv6 loopback (::ffff:0:0/96 range with 127.0.0.1)
             # and ::/96 range for compatible addresses
-            if ip in ipaddress.IPv6Network('::/96'):
+            # BOLT: Using pre-calculated class constant for speed
+            if ip in self._IPV6_COMPAT_NET:
                 try:
                     embedded_v4 = ipaddress.IPv4Address(ip.packed[12:16])
                     return embedded_v4.is_loopback
@@ -335,17 +343,20 @@ class InputValidator:
 
             # 🛡️ Sentinel: Check for IPv4-compatible IPv6 addresses (::/96 range)
             # Exclude loopback (::1) and unspecified (::) which are handled by is_loopback/is_unspecified
-            if ip != ipaddress.IPv6Address('::1') and ip != ipaddress.IPv6Address('::') and ip in ipaddress.IPv6Network('::/96'):
+            # BOLT: Using pre-calculated class constants for speed
+            if ip != self._IPV6_LOOPBACK and ip != self._IPV6_UNSPECIFIED and ip in self._IPV6_COMPAT_NET:
                 # Extract embedded IPv4 (last 32 bits)
                 return self._is_internal_ip(ipaddress.IPv4Address(ip.packed[12:16]))
 
             # 🛡️ Sentinel: Check for 6to4 (2002::/16)
-            if ip in ipaddress.IPv6Network('2002::/16'):
+            # BOLT: Using pre-calculated class constant for speed
+            if ip in self._IPV6_6TO4_NET:
                 # Extract embedded IPv4 (bits 16-47)
                 return self._is_internal_ip(ipaddress.IPv4Address(ip.packed[2:6]))
 
             # 🛡️ Sentinel: Check for Teredo (2001:0::/32)
-            if ip in ipaddress.IPv6Network('2001:0::/32'):
+            # BOLT: Using pre-calculated class constant for speed
+            if ip in self._IPV6_TEREDO_NET:
                 # Extract embedded IPv4 (last 32 bits, XORed with 0xFFFFFFFF)
                 ipv4_bytes = bytes([b ^ 0xFF for b in ip.packed[12:16]])
                 return self._is_internal_ip(ipaddress.IPv4Address(ipv4_bytes))
