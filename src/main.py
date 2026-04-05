@@ -123,8 +123,8 @@ def main():
         # are predicted to have at least one modified file in common.
         # This reduces the number of git calls from O(N^2) to O(Pairs with overlap).
         predictions = predictor.predict_conflicts(branches)
-        # BOLT: Normalize candidate branch pairs as sorted tuples for robust hash-based lookups.
-        candidate_pairs = [tuple(sorted(p['branches'])) for p in predictions]
+        # BOLT: predict_conflicts now returns branch pairs as pre-sorted tuples.
+        candidate_pairs = [p['branches'] for p in predictions]
 
         # BOLT: Only submit candidate branch pairs to the ThreadPoolExecutor to minimize task overhead.
         results = {}
