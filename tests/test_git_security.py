@@ -28,7 +28,8 @@ def test_get_diff_between_branches_vulnerable_branch(temp_repo):
         utils.get_diff_between_branches("master", "--version")
 
     # 🛡️ Sentinel: Test for shell metacharacters (Social Engineering injection)
-    dangerous_branches = ["main;touch_file", "main&whoami", "branch$(calc)", "branch`id`"]
+    # Also test for space and colon which were recently added
+    dangerous_branches = ["main;touch_file", "main&whoami", "branch$(calc)", "branch`id`", "branch with space", "branch:with:colon"]
     for db in dangerous_branches:
         with pytest.raises(ValueError, match="Invalid branch name"):
             utils.get_diff_between_branches(db, "master")
