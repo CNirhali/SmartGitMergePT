@@ -65,3 +65,7 @@
 ## 2026-03-30 - [Consistency and CSP-Compliant Dynamic Content]
 **Learning:** UX consistency across similar UI elements (like branch vs. file tags) reduces user surprise. When creating dynamic UI elements in a dashboard with a strict Content Security Policy (CSP), using `innerHTML` with strings containing tags (like `<kbd>`) can trigger "Unexpected identifier" errors or policy violations.
 **Action:** Always prioritize functional consistency for interactive tags. Use `document.createElement` and `textContent` instead of `innerHTML` for CSP-compliant dynamic content generation.
+
+## 2026-04-06 - [Card-Based Scenario Prioritization]
+**Learning:** In dashboards where multiple "risk scenarios" are monitored, presenting them as a scannable grid of interactive cards (with explicit status badges) is significantly more effective than a simple list. This pattern provides immediate visual feedback on which categories require attention and creates a clear, high-intent interaction target for filtering.
+**Action:** Use card-based layouts for category/scenario overviews and include clear, color-coded status badges (e.g., Warning/Clear) to drive user attention and interaction.

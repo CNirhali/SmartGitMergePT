@@ -160,11 +160,28 @@ template = '''
         .scenario-list { list-style: none; padding-left: 0; }
         .branch-sep { color: #57606a; margin: 0 4px; }
         #filter-results-count { font-size: 0.9em; color: #57606a; }
-        .scenario-types li { padding: 4px 8px; border-radius: 6px; transition: background-color 0.2s, transform 0.1s; cursor: pointer; border: 1px solid transparent; }
-        .scenario-types li:hover { background-color: #f6f8fa; }
-        .scenario-types li:focus-within { background-color: #f6f8fa; outline: 2px solid #0969da; outline-offset: -2px; }
-        .scenario-types li.active-filter { background-color: #ddf4ff; border-color: #0969da; border-left: 4px solid #0969da; }
-        .scenario-types li.highlight-secondary { background-color: #ddf4ff; border-color: #0969da; }
+        .scenario-types { display: flex; gap: 1em; flex-wrap: wrap; margin-bottom: 2em; }
+        .scenario-types li {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
+            transition: all 0.2s;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .scenario-types li:hover { border-color: #0969da; background-color: #f3f4f6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .scenario-types li:focus-within { outline: 2px solid #0969da; outline-offset: 2px; }
+        .scenario-types li:active { transform: translateY(0); }
+        .scenario-types li.active-filter { background-color: #ddf4ff; border-color: #0969da; box-shadow: 0 0 0 1px #0969da; }
+        .scenario-types li.highlight-secondary { border-color: #0969da; background-color: #f3f4f6; }
+        .scenario-types li strong { font-size: 1.1em; margin-bottom: 4px; display: block; }
+        .scenario-types li .scenario-desc { font-size: 0.85em; color: #57606a; }
         @media (max-width: 600px) {
             body { margin: 1em; }
             .summary { flex-direction: column; }
@@ -189,14 +206,10 @@ template = '''
     <div class="timestamp" style="margin-top: 0.5em;">Shortcuts: <kbd>/</kbd> focus, <kbd>Esc</kbd> clear, <kbd>r</kbd> refresh</div>
 
     <div class="summary">
-        <div class="summary-item" role="button" tabindex="0" aria-label="Jump to Monitored Branches ({{ branches|length }} total)" onclick="document.getElementById('branches-section').scrollIntoView({ behavior: 'smooth' })" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('branches-section').scrollIntoView({ behavior: 'smooth' })}">
+        <div class="summary-item" id="summary-branches" role="button" tabindex="0" aria-label="Show all branches and jump to list">
             <strong>Branches</strong>: {{ branches|length }}
         </div>
-        <div class="summary-item" role="button" tabindex="0" aria-label="Jump to Predicted Conflicts ({{ predictions|length }} found)" onclick="document.getElementById('conflicts-section').scrollIntoView({ behavior: 'smooth' })" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('conflicts-section').scrollIntoView({ behavior: 'smooth' })}">
-        <div class="summary-item" id="summary-branches" role="button" tabindex="0" aria-label="Show all branches and clear filter">
-            <strong>Branches</strong>: {{ branches|length }}
-        </div>
-        <div class="summary-item" id="summary-conflicts" role="button" tabindex="0" aria-label="Filter by predicted conflicts">
+        <div class="summary-item" id="summary-conflicts" role="button" tabindex="0" aria-label="Filter by predicted conflicts and jump to table">
             <strong>Conflict Pairs</strong>:
             <span class="badge {{ 'badge-error' if predictions else 'badge-success' }}" aria-label="{{ predictions|length }} conflicts detected">
                 {{ predictions|length }}
@@ -216,16 +229,25 @@ template = '''
     <h2>Scenario Types</h2>
     <ul class="scenario-types" style="list-style: none; padding-left: 0;">
         <li class="{{ 'present' if scenario_types['file_overlap'] else 'absent' }}" role="button" tabindex="0" aria-pressed="false" data-filter="File Overlap" data-scenario="file_overlap" aria-label="Filter by File Overlap: {{ scenario_types['file_overlap'] }} found">
-            {% if scenario_types['file_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
-            <strong>File Overlap</strong> ({{ scenario_types['file_overlap'] }}): Both branches modify the same file(s).
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <strong>File Overlap</strong>
+                {% if scenario_types['file_overlap'] %}<span class="badge badge-error">⚠️ {{ scenario_types['file_overlap'] }}</span>{% else %}<span class="badge badge-success">✅ Clear</span>{% endif %}
+            </div>
+            <span class="scenario-desc">Both branches modify the same file(s).</span>
         </li>
         <li class="{{ 'present' if scenario_types['line_overlap'] else 'absent' }}" role="button" tabindex="0" aria-pressed="false" data-filter="Line Overlap" data-scenario="line_overlap" aria-label="Filter by Line Overlap: {{ scenario_types['line_overlap'] }} found">
-            {% if scenario_types['line_overlap'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
-            <strong>Line Overlap</strong> ({{ scenario_types['line_overlap'] }}): Both branches change the same or similar lines in a file.
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <strong>Line Overlap</strong>
+                {% if scenario_types['line_overlap'] %}<span class="badge badge-error">⚠️ {{ scenario_types['line_overlap'] }}</span>{% else %}<span class="badge badge-success">✅ Clear</span>{% endif %}
+            </div>
+            <span class="scenario-desc">Both branches change the same or similar lines in a file.</span>
         </li>
         <li class="{{ 'present' if scenario_types['semantic_conflict'] else 'absent' }}" role="button" tabindex="0" aria-pressed="false" data-filter="Semantic Conflict" data-scenario="semantic_conflict" aria-label="Filter by Semantic Conflict: {{ scenario_types['semantic_conflict'] }} found">
-            {% if scenario_types['semantic_conflict'] %}<span role="img" aria-label="Warning" title="Detected">⚠️</span>{% else %}<span role="img" aria-label="Clear" title="Not detected">✅</span>{% endif %}
-            <strong>Semantic Conflict</strong> ({{ scenario_types['semantic_conflict'] }}): Changes are different but may cause logical or functional conflicts.
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <strong>Semantic Conflict</strong>
+                {% if scenario_types['semantic_conflict'] %}<span class="badge badge-error">⚠️ {{ scenario_types['semantic_conflict'] }}</span>{% else %}<span class="badge badge-success">✅ Clear</span>{% endif %}
+            </div>
+            <span class="scenario-desc">Changes are different but may cause logical or functional conflicts.</span>
         </li>
     </ul>
 
@@ -680,6 +702,7 @@ template = '''
                 filterInput.value = '';
                 filterInput.dispatchEvent(new Event('input'));
                 filterInput.focus();
+                document.getElementById('branches-section').scrollIntoView({ behavior: 'smooth' });
             });
             summaryBranches.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -694,6 +717,8 @@ template = '''
                 filterInput.value = 'predicted conflicts';
                 filterInput.dispatchEvent(new Event('input'));
                 filterInput.focus();
+                const section = document.getElementById('conflicts-section');
+                if (section) section.scrollIntoView({ behavior: 'smooth' });
             });
             summaryConflicts.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
