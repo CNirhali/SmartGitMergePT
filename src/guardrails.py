@@ -131,6 +131,9 @@ class InputValidator:
             r'Authorization:\s*(Bearer|Basic)\s+\S+',
             r'AKIA[0-9A-Z]{16}',
             r'aws_secret_access_key\s*[:=]\s*\S+',
+            r'ghp_[a-zA-Z0-9]{36}',
+            r'github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}',
+            r'-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----',
         ]
         self._sensitive_re = re.compile('|'.join(sensitive_patterns), re.IGNORECASE)
         
@@ -224,11 +227,15 @@ class InputValidator:
         except Exception as e:
             return False, f"Path validation error: {str(e)}"
     
-    def validate_url(self, url: str, allow_local: bool = False) -> Tuple[bool, str]:
+    def validate_url(self, url: str, allow_local: bool = False, max_length: int = 2048) -> Tuple[bool, str]:
         """Validate URL for security (SSRF and protocol bypass protection)"""
         try:
             if not isinstance(url, str):
                 return False, "URL must be a string"
+
+            # 🛡️ Sentinel: Check URL length to prevent potential DoS
+            if len(url) > max_length:
+                return False, f"URL too long (max {max_length} characters)"
 
             # 🛡️ Sentinel: Strip whitespace and check for null bytes to prevent bypasses
             url = url.strip()

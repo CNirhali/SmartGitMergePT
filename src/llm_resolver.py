@@ -13,8 +13,13 @@ def resolve_conflict_with_mistral(conflict_block: str) -> str:
             ["mistral-cli", "--resolve-conflict"],
             input=conflict_block.encode(),
             capture_output=True,
-            check=True
+            check=True,
+            timeout=30
         )
         return result.stdout.decode().strip()
-    except Exception as e:
-        return f"[LLM Resolution Error]: {e}" 
+    except subprocess.TimeoutExpired:
+        return "[LLM Resolution Error]: Request timed out after 30 seconds"
+    except subprocess.CalledProcessError as e:
+        return f"[LLM Resolution Error]: Process failed with exit code {e.returncode}"
+    except Exception:
+        return "[LLM Resolution Error]: An unexpected error occurred during resolution"
