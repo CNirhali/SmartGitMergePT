@@ -49,7 +49,8 @@ def check_webcam():
     except ImportError:
         print("⚠️  OpenCV not available, webcam check skipped")
     except Exception as e:
-        print(f"⚠️  Webcam check failed: {e}")
+        # 🛡️ Sentinel: Don't let optional hardware check fail the entire install
+        print(f"⚠️  Webcam check skipped or failed: {e}")
 
 def setup_configuration():
     """Setup initial configuration"""

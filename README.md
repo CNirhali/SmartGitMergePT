@@ -119,6 +119,11 @@ pip install -r requirements.txt
 python src/main.py config
 ```
 
+5. **Initialize project** (optional):
+```bash
+python install.py
+```
+
 ## 🎮 Usage
 
 ### Basic Git Operations
