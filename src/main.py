@@ -157,6 +157,15 @@ def main():
         print("Paste the merge conflict block (end with EOF / Ctrl-D):")
         import sys
         conflict_block = sys.stdin.read()
+
+        # 🛡️ Sentinel: Validate input to prevent oversized payloads or injection
+        if GUARDRAILS_AVAILABLE:
+            is_valid, clean_block = guardrails_manager.input_validator.validate_string(conflict_block, max_length=100000)
+            if not is_valid:
+                print(f"❌ Invalid conflict block: {clean_block}")
+                return
+            conflict_block = clean_block
+
         resolved = resolve_conflict_with_mistral(conflict_block)
         print("\nResolved block:\n")
         print(resolved)
@@ -243,11 +252,27 @@ def track_developer(repo_path: str):
         developer_id = "alice_dev_001"
         print(f"Using default developer ID: {developer_id}")
     
+    # 🛡️ Sentinel: Validate developer_id
+    if GUARDRAILS_AVAILABLE:
+        is_valid, clean_id = guardrails_manager.input_validator.validate_string(developer_id, max_length=100)
+        if not is_valid:
+            print(f"❌ Invalid developer ID: {clean_id}")
+            return
+        developer_id = clean_id
+
     # Get branch info
     branch_name = input("Enter branch name: ").strip()
     if not branch_name:
         branch_name = "feature/user-authentication"
         print(f"Using default branch: {branch_name}")
+
+    # 🛡️ Sentinel: Validate branch_name
+    try:
+        git_utils = GitUtils(repo_path)
+        git_utils.validate_branch_name(branch_name)
+    except ValueError as e:
+        print(f"❌ Invalid branch name: {e}")
+        return
     
     # Initialize tracker
     tracker = AgenticTracker(repo_path)

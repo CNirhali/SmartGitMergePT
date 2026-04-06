@@ -47,8 +47,8 @@ class ConflictPredictor:
                 # since it diverged from main_branch. This is semantically correct for
                 # conflict prediction (as we only care about new changes in the feature branch)
                 # and significantly reduces the amount of data processed when main_branch is busy.
-                self.git_utils._validate_branch_name(main_branch)
-                self.git_utils._validate_branch_name(branch)
+                self.git_utils.validate_branch_name(main_branch)
+                self.git_utils.validate_branch_name(branch)
                 diff = self.git_utils.repo.git.diff(f'{main_branch}...{branch}', unified=0)
             except:
                 diff = ""
