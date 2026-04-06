@@ -185,10 +185,12 @@ class InputValidator:
             return False, "Null byte detected in input"
         
         # 🛡️ Sentinel: Check both raw and unquoted versions to catch percent-encoded bypasses
+        # BOLT: Optimization - unquote() returns the original object if no % is found.
+        # Identity check (is not) allows skipping the redundant second regex pass.
         unquoted_value = unquote(value)
 
         # BOLT: Use pre-compiled combined regex for high-performance security check
-        if self._combined_security_re.search(value) or self._combined_security_re.search(unquoted_value):
+        if self._combined_security_re.search(value) or (unquoted_value is not value and self._combined_security_re.search(unquoted_value)):
             # If hit, do individual checks to return specific error messages
             if self._sensitive_re.search(value) or self._sensitive_re.search(unquoted_value):
                 return False, "Sensitive data detected in input"
@@ -243,7 +245,9 @@ class InputValidator:
                 return False, "Null byte detected in URL"
 
             # 🛡️ Sentinel: Check both raw and unquoted URL for robust protocol detection (e.g. j a v a s c r i p t :)
-            if self._dangerous_protocol_re.search(url) or self._dangerous_protocol_re.search(unquote(url)):
+            # BOLT: Optimization - skip redundant regex if unquoted URL is identical to raw URL.
+            unquoted_url = unquote(url)
+            if self._dangerous_protocol_re.search(url) or (unquoted_url is not url and self._dangerous_protocol_re.search(unquoted_url)):
                 return False, "Dangerous URL protocol detected"
 
             parsed = urlparse(url)
@@ -404,7 +408,9 @@ class InputValidator:
                 return html.escape(text)
 
             # 🛡️ Sentinel: Use the pre-compiled regex for fast-path check on both raw and unquoted text
-            if not self._dangerous_protocol_re.search(text) and not self._dangerous_protocol_re.search(unquote(text)):
+            # BOLT: Optimization - skip redundant regex if unquoted text is identical to raw text.
+            unquoted_text = unquote(text)
+            if not self._dangerous_protocol_re.search(text) and (unquoted_text is text or not self._dangerous_protocol_re.search(unquoted_text)):
                 # If no tags and no dangerous protocols, we only need html.escape for safety
                 return html.escape(text)
 
