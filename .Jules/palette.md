@@ -65,3 +65,7 @@
 ## 2026-03-30 - [Consistency and CSP-Compliant Dynamic Content]
 **Learning:** UX consistency across similar UI elements (like branch vs. file tags) reduces user surprise. When creating dynamic UI elements in a dashboard with a strict Content Security Policy (CSP), using `innerHTML` with strings containing tags (like `<kbd>`) can trigger "Unexpected identifier" errors or policy violations.
 **Action:** Always prioritize functional consistency for interactive tags. Use `document.createElement` and `textContent` instead of `innerHTML` for CSP-compliant dynamic content generation.
+
+## 2026-04-07 - [Hybrid Interactive Components]
+**Learning:** When multiple UI elements target the same high-level entity (e.g., "Conflicts") with different actions (one for filtering, one for navigation), consolidating them into a single "hybrid" component improves cognitive clarity and reduces interface clutter. Users perceive the combined action (filter + jump-to-section) as a more cohesive "drill-down" experience.
+**Action:** Identify redundant interactive elements that share a common semantic target and merge their behaviors into a single, well-labeled component with unified event handling.
