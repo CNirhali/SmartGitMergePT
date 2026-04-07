@@ -189,6 +189,10 @@ class InputValidator:
         # Identity check (is not) allows skipping the redundant second regex pass.
         unquoted_value = unquote(value)
 
+        # 🛡️ Sentinel: Check for null bytes in unquoted value to prevent obfuscation bypasses
+        if '\0' in unquoted_value:
+            return False, "Null byte detected in decoded input"
+
         # BOLT: Use pre-compiled combined regex for high-performance security check
         if self._combined_security_re.search(value) or (unquoted_value is not value and self._combined_security_re.search(unquoted_value)):
             # If hit, do individual checks to return specific error messages
@@ -200,7 +204,7 @@ class InputValidator:
                 return False, "SQL injection attempt detected"
 
         # 🛡️ Sentinel: Also check for dangerous protocols in strings
-        if self._dangerous_protocol_re.search(value) or self._dangerous_protocol_re.search(unquoted_value):
+        if self._dangerous_protocol_re.search(value) or (unquoted_value is not value and self._dangerous_protocol_re.search(unquoted_value)):
             return False, "Dangerous protocol detected in input"
         
         # Sanitize HTML if not allowed
@@ -247,6 +251,11 @@ class InputValidator:
             # 🛡️ Sentinel: Check both raw and unquoted URL for robust protocol detection (e.g. j a v a s c r i p t :)
             # BOLT: Optimization - skip redundant regex if unquoted URL is identical to raw URL.
             unquoted_url = unquote(url)
+
+            # 🛡️ Sentinel: Check for null bytes in unquoted URL to prevent obfuscation bypasses
+            if '\0' in unquoted_url:
+                return False, "Null byte detected in decoded URL"
+
             if self._dangerous_protocol_re.search(url) or (unquoted_url is not url and self._dangerous_protocol_re.search(unquoted_url)):
                 return False, "Dangerous URL protocol detected"
 
@@ -410,6 +419,11 @@ class InputValidator:
             # 🛡️ Sentinel: Use the pre-compiled regex for fast-path check on both raw and unquoted text
             # BOLT: Optimization - skip redundant regex if unquoted text is identical to raw text.
             unquoted_text = unquote(text)
+
+            # 🛡️ Sentinel: Check for null bytes in unquoted text to prevent obfuscation bypasses
+            if '\0' in unquoted_text:
+                return html.escape(text)
+
             if not self._dangerous_protocol_re.search(text) and (unquoted_text is text or not self._dangerous_protocol_re.search(unquoted_text)):
                 # If no tags and no dangerous protocols, we only need html.escape for safety
                 return html.escape(text)

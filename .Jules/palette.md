@@ -69,3 +69,6 @@
 ## 2026-04-06 - [Card-Based Scenario Prioritization]
 **Learning:** In dashboards where multiple "risk scenarios" are monitored, presenting them as a scannable grid of interactive cards (with explicit status badges) is significantly more effective than a simple list. This pattern provides immediate visual feedback on which categories require attention and creates a clear, high-intent interaction target for filtering.
 **Action:** Use card-based layouts for category/scenario overviews and include clear, color-coded status badges (e.g., Warning/Clear) to drive user attention and interaction.
+## 2026-04-07 - [Hybrid Interactive Components]
+**Learning:** When multiple UI elements target the same high-level entity (e.g., "Conflicts") with different actions (one for filtering, one for navigation), consolidating them into a single "hybrid" component improves cognitive clarity and reduces interface clutter. Users perceive the combined action (filter + jump-to-section) as a more cohesive "drill-down" experience.
+**Action:** Identify redundant interactive elements that share a common semantic target and merge their behaviors into a single, well-labeled component with unified event handling.

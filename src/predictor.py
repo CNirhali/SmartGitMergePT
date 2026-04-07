@@ -127,13 +127,15 @@ class ConflictPredictor:
 
         # BOLT: Accumulate file overlaps across pairs incrementally.
         # This avoids redundant O(F) set intersections and seen_pairs overhead.
-        pair_overlaps = collections.defaultdict(set)
+        # BOLT: Change from set to list as (pair, common_file) is unique by iteration.
+        pair_overlaps = collections.defaultdict(list)
         for common_file, sharers in file_to_branches.items():
             for i, branch_a in enumerate(sharers):
                 for branch_b in sharers[i+1:]:
                     # BOLT: Faster pair creation without sorted()
                     pair = (branch_a, branch_b) if branch_a < branch_b else (branch_b, branch_a)
-                    pair_overlaps[pair].add(common_file)
+                    # BOLT: list.append() is faster than set.add() due to lack of hashing.
+                    pair_overlaps[pair].append(common_file)
 
         # BOLT: Process pairs with confirmed overlaps
         for pair, overlap in pair_overlaps.items():
@@ -153,7 +155,7 @@ class ConflictPredictor:
 
             predictions.append({
                 'branches': pair,
-                'files': list(overlap),
+                'files': overlap,  # BOLT: Already a list
                 'line_conflicts': line_conflicts,
                 'semantic_conflict': False, # Redundant for line atoms
                 'conflict_likely': True
@@ -183,8 +185,8 @@ class ConflictPredictor:
                     current_lines.add(line[1:])
             elif c0 == 'd':  # diff --git ...
                 if line.startswith('diff --git'):
-                    # Extract file path after ' b/' to avoid multiple splits
-                    b_idx = line.find(' b/')
+                    # BOLT: Optimized search starting after 'diff --git ' (11 chars)
+                    b_idx = line.find(' b/', 11)
                     if b_idx != -1:
                         current_file = line[b_idx + 3:]
                         files.add(current_file)

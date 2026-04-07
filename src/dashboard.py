@@ -106,11 +106,7 @@ template = '''
         .summary-item { background: #f6f8fa; padding: 12px 20px; border-radius: 8px; border: 1px solid #d0d7de; cursor: pointer; transition: all 0.2s; user-select: none; }
         .summary-item:hover { border-color: #0969da; background-color: #f3f4f6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .summary-item:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
-        .summary-item:active { transform: translateY(0); }
-        .summary-item { background: #f6f8fa; padding: 12px 20px; border-radius: 8px; border: 1px solid #d0d7de; transition: all 0.2s; cursor: pointer; user-select: none; }
-        .summary-item:hover { background-color: #f3f4f6; border-color: #afb8c1; }
-        .summary-item:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
-        .summary-item:active { background-color: #ebecf0; transform: translateY(1px); }
+        .summary-item:active { transform: translateY(0); background-color: #ebecf0; }
         .conflict-yes { color: #cf222e; font-weight: 600; }
         .conflict-no { color: #57606a; }
         .skip-link {
@@ -210,6 +206,10 @@ template = '''
             <strong>Branches</strong>: {{ branches|length }}
         </div>
         <div class="summary-item" id="summary-conflicts" role="button" tabindex="0" aria-label="Filter by predicted conflicts and jump to table">
+        <div class="summary-item" id="summary-branches" role="button" tabindex="0" aria-label="Show all branches, clear filter, and jump to Monitored Branches ({{ branches|length }} total)">
+            <strong>Branches</strong>: {{ branches|length }}
+        </div>
+        <div class="summary-item" id="summary-conflicts" role="button" tabindex="0" aria-label="Filter by predicted conflicts and jump to Predicted Conflicts ({{ predictions|length }} found)">
             <strong>Conflict Pairs</strong>:
             <span class="badge {{ 'badge-error' if predictions else 'badge-success' }}" aria-label="{{ predictions|length }} conflicts detected">
                 {{ predictions|length }}
