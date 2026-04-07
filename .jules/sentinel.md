@@ -149,3 +149,8 @@
 **Vulnerability:** InputValidator was vulnerable to bypasses of its security regexes (SQLi, Path Traversal, Dangerous Protocols) if the input was percent-encoded.
 **Learning:** Security filters often operate on raw strings, but downstream components or browsers may decode percent-encoded data, allowing malicious payloads to evade initial detection.
 **Prevention:** Always normalize input by unquoting it before applying security filters and regex checks. Validate both the raw and normalized versions for defense-in-depth.
+
+## 2026-04-04 - [Null Byte Obfuscation Bypass in Security Filters]
+**Vulnerability:** `InputValidator` could be bypassed using percent-encoded null bytes (e.g., `java%00script:`) because the security regexes fail to match patterns containing null bytes, even after unquoting.
+**Learning:** Decoded null bytes can break regex pattern matching for strings that would otherwise be flagged. Many systems (like browsers) ignore or strip null bytes, reassembling the malicious payload.
+**Prevention:** Explicitly check for and reject null bytes (`\0`) in all security-sensitive inputs, especially after decoding/unquoting steps.
