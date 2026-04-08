@@ -157,8 +157,14 @@ class InputValidator:
         _SENSITIVE_PATTERNS + _PATH_TRAVERSAL_PATTERNS + _SQL_INJECTION_PATTERNS
     ), re.IGNORECASE)
 
+    # 🛡️ Sentinel: Use innermost matching for tags to support recursive sanitization
     _HTML_TAG_RE = re.compile(r'<[^<>]*+>')
-    _SCRIPT_TAG_RE = re.compile(r'<script[^<>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
+    # 🛡️ Sentinel: Handle optional whitespace in script closing tags to prevent bypasses
+    _SCRIPT_TAG_RE = re.compile(r'<script[^<>]*>.*?</script\s*>', re.IGNORECASE | re.DOTALL)
+    # 🛡️ Sentinel: Support optional whitespace within/after dangerous protocols to prevent bypasses (e.g. j a v a s c r i p t : )
+    # BOLT: Using a combination of character sets and atomic groups (emulated via lookahead) if supported,
+    # but standard possessive quantifiers (\s*+) are available in Python 3.11+.
+    # Expanded with file, gopher, php, jar, dict, and ldap to prevent SSRF and other URI-based attacks.
     _DANGEROUS_PROTOCOL_RE = re.compile(
         r'(j\s*+a\s*+v\s*+a\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|v\s*+b\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|d\s*+a\s*+t\s*+a|'
         r'f\s*+i\s*+l\s*+e|g\s*+o\s*+p\s*+h\s*+e\s*+r|p\s*+h\s*+p|j\s*+a\s*+r|'
