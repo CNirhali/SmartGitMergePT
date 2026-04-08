@@ -119,58 +119,68 @@ class InputValidator:
     _IPV6_6TO4_NET = ipaddress.IPv6Network('2002::/16')
     _IPV6_TEREDO_NET = ipaddress.IPv6Network('2001:0::/32')
 
+    # 🛡️ Sentinel: ISATAP prefix identifiers (RFC 5214)
+    _ISATAP_PREFIXES = (b'\x00\x00\x5e\xfe', b'\x02\x00\x5e\xfe')
+
+    # BOLT: Move regex patterns and compiled objects to class level for performance
+    _SENSITIVE_PATTERNS = [
+        r'password\s*[:=]\s*\S+',
+        r'api_key\s*[:=]\s*\S+',
+        r'token\s*[:=]\s*\S+',
+        r'secret\s*[:=]\s*\S+',
+        r'private_key\s*[:=]\s*\S+',
+        r'Authorization:\s*(Bearer|Basic)\s+\S+',
+        r'AKIA[0-9A-Z]{16}',
+        r'aws_secret_access_key\s*[:=]\s*\S+',
+        r'ghp_[a-zA-Z0-9]{36}',
+        r'github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}',
+        r'-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----',
+    ]
+    _SENSITIVE_RE = re.compile('|'.join(_SENSITIVE_PATTERNS), re.IGNORECASE)
+
+    _PATH_TRAVERSAL_PATTERNS = [
+        r'\.\./',
+        r'\.\.\\',
+        r'%2e%2e%2f',
+        r'%2e%2e%5c',
+    ]
+    _PATH_TRAVERSAL_RE = re.compile('|'.join(_PATH_TRAVERSAL_PATTERNS), re.IGNORECASE)
+
+    _SQL_INJECTION_PATTERNS = [
+        r'(\b(union|select|insert|update|delete|drop|create|alter)\b)',
+        r'(\b(or|and)\b\s+\d+\s*[=<>])',
+        r'(\b(union|select)\b.*\bfrom\b)',
+    ]
+    _SQL_INJECTION_RE = re.compile('|'.join(_SQL_INJECTION_PATTERNS), re.IGNORECASE)
+
+    _COMBINED_SECURITY_RE = re.compile('|'.join(
+        _SENSITIVE_PATTERNS + _PATH_TRAVERSAL_PATTERNS + _SQL_INJECTION_PATTERNS
+    ), re.IGNORECASE)
+
+    # 🛡️ Sentinel: Use innermost matching for tags to support recursive sanitization
+    _HTML_TAG_RE = re.compile(r'<[^<>]*+>')
+    # 🛡️ Sentinel: Handle optional whitespace in script closing tags to prevent bypasses
+    _SCRIPT_TAG_RE = re.compile(r'<script[^<>]*>.*?</script\s*>', re.IGNORECASE | re.DOTALL)
+    # 🛡️ Sentinel: Support optional whitespace within/after dangerous protocols to prevent bypasses (e.g. j a v a s c r i p t : )
+    # BOLT: Using a combination of character sets and atomic groups (emulated via lookahead) if supported,
+    # but standard possessive quantifiers (\s*+) are available in Python 3.11+.
+    # Expanded with file, gopher, php, jar, dict, and ldap to prevent SSRF and other URI-based attacks.
+    _DANGEROUS_PROTOCOL_RE = re.compile(
+        r'(j\s*+a\s*+v\s*+a\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|v\s*+b\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|d\s*+a\s*+t\s*+a|'
+        r'f\s*+i\s*+l\s*+e|g\s*+o\s*+p\s*+h\s*+e\s*+r|p\s*+h\s*+p|j\s*+a\s*+r|'
+        r'd\s*+i\s*+c\s*+t|l\s*+d\s*+a\s*+p)\s*+:',
+        re.IGNORECASE
+    )
+
     def __init__(self):
-        # BOLT: Pre-compile and combine patterns for performance
-        # Using a single combined regex reduces re.search calls from N to 1
-        sensitive_patterns = [
-            r'password\s*[:=]\s*\S+',
-            r'api_key\s*[:=]\s*\S+',
-            r'token\s*[:=]\s*\S+',
-            r'secret\s*[:=]\s*\S+',
-            r'private_key\s*[:=]\s*\S+',
-            r'Authorization:\s*(Bearer|Basic)\s+\S+',
-            r'AKIA[0-9A-Z]{16}',
-            r'aws_secret_access_key\s*[:=]\s*\S+',
-            r'ghp_[a-zA-Z0-9]{36}',
-            r'github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}',
-            r'-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----',
-        ]
-        self._sensitive_re = re.compile('|'.join(sensitive_patterns), re.IGNORECASE)
-        
-        path_traversal_patterns = [
-            r'\.\./',
-            r'\.\.\\',
-            r'%2e%2e%2f',
-            r'%2e%2e%5c',
-        ]
-        self._path_traversal_re = re.compile('|'.join(path_traversal_patterns), re.IGNORECASE)
-        
-        sql_injection_patterns = [
-            r'(\b(union|select|insert|update|delete|drop|create|alter)\b)',
-            r'(\b(or|and)\b\s+\d+\s*[=<>])',
-            r'(\b(union|select)\b.*\bfrom\b)',
-        ]
-        self._sql_injection_re = re.compile('|'.join(sql_injection_patterns), re.IGNORECASE)
-
-        # BOLT: Combined security regex for faster all-in-one check
-        self._combined_security_re = re.compile('|'.join(
-            sensitive_patterns + path_traversal_patterns + sql_injection_patterns
-        ), re.IGNORECASE)
-
-        # BOLT: Pre-compile HTML patterns
-        # 🛡️ Sentinel: Use innermost matching for tags to support recursive sanitization
-        self._html_tag_re = re.compile(r'<[^<>]*+>')
-        self._script_tag_re = re.compile(r'<script[^<>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
-        # 🛡️ Sentinel: Support optional whitespace within/after dangerous protocols to prevent bypasses (e.g. j a v a s c r i p t : )
-        # BOLT: Using a combination of character sets and atomic groups (emulated via lookahead) if supported,
-        # but standard possessive quantifiers (\s*+) are available in Python 3.11+.
-        # Expanded with file, gopher, php, jar, dict, and ldap to prevent SSRF and other URI-based attacks.
-        self._dangerous_protocol_re = re.compile(
-            r'(j\s*+a\s*+v\s*+a\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|v\s*+b\s*+s\s*+c\s*+r\s*+i\s*+p\s*+t|d\s*+a\s*+t\s*+a|'
-            r'f\s*+i\s*+l\s*+e|g\s*+o\s*+p\s*+h\s*+e\s*+r|p\s*+h\s*+p|j\s*+a\s*+r|'
-            r'd\s*+i\s*+c\s*+t|l\s*+d\s*+a\s*+p)\s*+:',
-            re.IGNORECASE
-        )
+        # BOLT: Instance attributes now refer to optimized class-level regexes
+        self._sensitive_re = self._SENSITIVE_RE
+        self._path_traversal_re = self._PATH_TRAVERSAL_RE
+        self._sql_injection_re = self._SQL_INJECTION_RE
+        self._combined_security_re = self._COMBINED_SECURITY_RE
+        self._html_tag_re = self._HTML_TAG_RE
+        self._script_tag_re = self._SCRIPT_TAG_RE
+        self._dangerous_protocol_re = self._DANGEROUS_PROTOCOL_RE
     
     def validate_string(self, value: str, max_length: int = 1000, allow_html: bool = False) -> Tuple[bool, str]:
         """Validate and sanitize string input"""
@@ -383,18 +393,13 @@ class InputValidator:
 
             # 🛡️ Sentinel: Check for ISATAP (RFC 5214 Interface ID starts with 0000:5efe or 0200:5efe)
             # ISATAP embeds an IPv4 address in the last 32 bits of the 64-bit interface ID.
-            if ip.packed[8:12] in (b'\x00\x00\x5e\xfe', b'\x02\x00\x5e\xfe'):
+            # BOLT: Using pre-calculated class constant for speed
+            if ip.packed[8:12] in self._ISATAP_PREFIXES:
                 return self._is_internal_ip(ipaddress.IPv4Address(ip.packed[12:16]))
 
-        return (
-            ip.is_loopback or
-            ip.is_private or
-            ip.is_link_local or
-            ip.is_multicast or
-            ip.is_reserved or
-            ip.is_unspecified or
-            not ip.is_global
-        )
+        # BOLT: 'not ip.is_global' is a high-performance replacement for checking
+        # loopback, private, link-local, multicast, reserved, and unspecified ranges.
+        return not ip.is_global
     
     def _sanitize_html(self, text: str) -> str:
         """Robust recursive HTML sanitization to prevent nested tag/protocol bypasses"""
