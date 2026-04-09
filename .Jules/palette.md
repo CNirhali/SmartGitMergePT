@@ -72,3 +72,7 @@
 ## 2026-04-07 - [Hybrid Interactive Components]
 **Learning:** When multiple UI elements target the same high-level entity (e.g., "Conflicts") with different actions (one for filtering, one for navigation), consolidating them into a single "hybrid" component improves cognitive clarity and reduces interface clutter. Users perceive the combined action (filter + jump-to-section) as a more cohesive "drill-down" experience.
 **Action:** Identify redundant interactive elements that share a common semantic target and merge their behaviors into a single, well-labeled component with unified event handling.
+
+## 2026-04-09 - [Heading-Level Bulk Copy Actions]
+**Learning:** For dashboards with grouped data, providing a "Copy List" or "Copy Summary" button at the heading level (appearing on focus/hover) provides a powerful utility for developers who need to share or process data in bulk without manually selecting text. Using flexbox to justify these buttons to the far right of the heading keeps the primary focus on the title while providing a clear interaction target.
+**Action:** Implement justified bulk copy buttons in section headings to improve data portability and developer efficiency.
