@@ -32,6 +32,7 @@ template = '''
     <style nonce="{{ nonce }}">
         html { scroll-behavior: smooth; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; margin: 2em; line-height: 1.5; color: #24292f; }
+        h2 { display: flex; align-items: center; justify-content: space-between; max-width: 900px; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
         table { border-collapse: collapse; width: 100%; max-width: 900px; margin-top: 1em; }
         th, td { border: 1px solid #d0d7de; padding: 12px; text-align: left; }
         th { background: #f6f8fa; font-weight: 600; position: sticky; top: 0; z-index: 10; box-shadow: inset 0 -1px 0 #d0d7de; }
@@ -202,10 +203,6 @@ template = '''
     <div class="timestamp" style="margin-top: 0.5em;">Shortcuts: <kbd>/</kbd> focus, <kbd>Esc</kbd> clear, <kbd>r</kbd> refresh</div>
 
     <div class="summary">
-        <div class="summary-item" id="summary-branches" role="button" tabindex="0" aria-label="Show all branches and jump to list">
-            <strong>Branches</strong>: {{ branches|length }}
-        </div>
-        <div class="summary-item" id="summary-conflicts" role="button" tabindex="0" aria-label="Filter by predicted conflicts and jump to table">
         <div class="summary-item" id="summary-branches" role="button" tabindex="0" aria-label="Show all branches, clear filter, and jump to Monitored Branches ({{ branches|length }} total)">
             <strong>Branches</strong>: {{ branches|length }}
         </div>
@@ -217,7 +214,10 @@ template = '''
         </div>
     </div>
 
-    <h2 id="branches-section">Monitored Branches</h2>
+    <h2 id="branches-section">
+        Monitored Branches
+        <button class="copy-diff-btn" style="display: inline-block; font-size: 13px; margin-top: 4px;" aria-label="Copy list of all monitored branches" title="Copy branch list" data-summary="{{ branches_summary }}">📋 Copy List</button>
+    </h2>
     <ul id="monitored-branches-list">
     {% for branch in branches %}
         {% set conflict_count = conflicting_branches.get(branch, 0) %}
@@ -251,7 +251,10 @@ template = '''
         </li>
     </ul>
 
-    <h2 id="conflicts-section">Predicted Conflicts</h2>
+    <h2 id="conflicts-section">
+        Predicted Conflicts
+        <button class="copy-diff-btn" style="display: inline-block; font-size: 13px; margin-top: 4px;" aria-label="Copy summary of all predicted conflicts" title="Copy conflict summary" data-summary="{{ conflicts_summary }}">📋 Copy Summary</button>
+    </h2>
     {% if predictions %}
     <table aria-label="Predicted merge conflicts">
         <thead>
@@ -477,7 +480,9 @@ template = '''
         document.querySelectorAll('.copy-diff-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                copyToClipboard(btn, 'data-diff', btn.closest('tr'), true);
+                const attr = btn.hasAttribute('data-summary') ? 'data-summary' : 'data-diff';
+                const successEl = btn.closest('tr') || btn;
+                copyToClipboard(btn, attr, successEl, true);
             });
         });
 
@@ -791,6 +796,19 @@ def dashboard():
     # This puts the base branch first, then those with most conflicts.
     branches.sort(key=lambda b: (b != main_branch, -conflicting_branches[b], b))
 
+    # PALETTE: Prepare text summaries for heading-level copy buttons
+    branches_summary = ", ".join(branches)
+    conflicts_summary_list = []
+    for pred in predictions:
+        b1, b2 = pred['branches']
+        files = ", ".join(pred.get('files', []))
+        scenarios = []
+        if pred.get('line_conflicts'): scenarios.append("Line Overlap")
+        if pred.get('semantic_conflict'): scenarios.append("Semantic Conflict")
+        scenarios_str = f" ({', '.join(scenarios)})" if scenarios else ""
+        conflicts_summary_list.append(f"{b1} <-> {b2}: {files}{scenarios_str}")
+    conflicts_summary = "\n".join(conflicts_summary_list) if conflicts_summary_list else "No conflicts detected."
+
     scenario_types = {
         'file_overlap': file_overlap_count,
         'line_overlap': line_overlap_count,
@@ -804,6 +822,8 @@ def dashboard():
         predictions=predictions,
         conflicting_branches=conflicting_branches,
         scenario_types=scenario_types,
+        branches_summary=branches_summary,
+        conflicts_summary=conflicts_summary,
         now=datetime.now(timezone.utc)
     )
 
