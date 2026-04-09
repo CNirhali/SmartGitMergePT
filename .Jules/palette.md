@@ -76,3 +76,7 @@
 ## 2026-04-09 - [Heading-Level Bulk Copy Actions]
 **Learning:** For dashboards with grouped data, providing a "Copy List" or "Copy Summary" button at the heading level (appearing on focus/hover) provides a powerful utility for developers who need to share or process data in bulk without manually selecting text. Using flexbox to justify these buttons to the far right of the heading keeps the primary focus on the title while providing a clear interaction target.
 **Action:** Implement justified bulk copy buttons in section headings to improve data portability and developer efficiency.
+
+## 2026-04-10 - [Section-Level Feedback and Noise Reduction]
+**Learning:** In dashboards with extensive lists and tables, global filtering can leave behind "ghost" headers and empty list items that create visual noise. Implementing section-level match counts and auto-hiding empty sections provides immediate cognitive feedback and ensures a clean, relevant interface during search.
+**Action:** Always sync the visibility of parent container elements (like <li> or <section>) with their interactive children during filtering, and use match counts in headings to provide real-time results feedback.
