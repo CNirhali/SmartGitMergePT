@@ -92,7 +92,8 @@ template = '''
             transition: all 0.2s;
         }
         .copy-diff-btn:hover { background: #ebecf0; color: #24292f; border-color: #afb8c1; }
-        tr:hover .copy-diff-btn, tr:focus-within .copy-diff-btn { display: inline-block; }
+        tr:hover .copy-diff-btn, tr:focus-within .copy-diff-btn,
+        h2:hover .copy-diff-btn, h2:focus-within .copy-diff-btn { display: inline-block; }
         .file-tag { cursor: pointer; transition: background-color 0.2s, transform 0.1s; position: relative; display: inline-block; white-space: nowrap; user-select: none; }
         .file-tag:hover { background: #afb8c166; }
         .file-tag:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
@@ -215,8 +216,8 @@ template = '''
     </div>
 
     <h2 id="branches-section">
-        Monitored Branches
-        <button class="copy-diff-btn" style="display: inline-block; font-size: 13px; margin-top: 4px;" aria-label="Copy list of all monitored branches" title="Copy branch list" data-summary="{{ branches_summary }}">📋 Copy List</button>
+        Monitored Branches <span class="match-count" style="font-size: 0.7em; font-weight: normal; color: #57606a;"></span>
+        <button class="copy-diff-btn" style="font-size: 13px; margin-top: 4px;" aria-label="Copy list of all monitored branches" title="Copy branch list" data-summary="{{ branches_summary }}">📋 Copy List</button>
     </h2>
     <ul id="monitored-branches-list">
     {% for branch in branches %}
@@ -252,8 +253,8 @@ template = '''
     </ul>
 
     <h2 id="conflicts-section">
-        Predicted Conflicts
-        <button class="copy-diff-btn" style="display: inline-block; font-size: 13px; margin-top: 4px;" aria-label="Copy summary of all predicted conflicts" title="Copy conflict summary" data-summary="{{ conflicts_summary }}">📋 Copy Summary</button>
+        Predicted Conflicts <span class="match-count" style="font-size: 0.7em; font-weight: normal; color: #57606a;"></span>
+        <button class="copy-diff-btn" style="font-size: 13px; margin-top: 4px;" aria-label="Copy summary of all predicted conflicts" title="Copy conflict summary" data-summary="{{ conflicts_summary }}">📋 Copy Summary</button>
     </h2>
     {% if predictions %}
     <table aria-label="Predicted merge conflicts">
@@ -607,6 +608,7 @@ template = '''
             });
 
             // Update all branch tags (monitored list + table) for highlighting
+            let visibleBranchesCount = 0;
             document.querySelectorAll('.branch-tag').forEach(tag => {
                 const branchName = tag.getAttribute('data-branch');
                 const text = branchName.toLowerCase();
@@ -616,7 +618,12 @@ template = '''
                 if (tag.closest('#monitored-branches-list')) {
                     const matchesQuery = terms.every(term => text.includes(term));
                     const isInVisibleConflict = visibleBranchesInTable.has(branchName);
-                    tag.style.display = (matchesQuery || isInVisibleConflict) ? 'inline-block' : 'none';
+                    const isVisible = matchesQuery || isInVisibleConflict;
+                    tag.style.display = isVisible ? 'inline-block' : 'none';
+                    // PALETTE: Hide parent <li> to avoid empty space/bullet points
+                    const parentLi = tag.closest('li');
+                    if (parentLi) parentLi.style.display = isVisible ? 'inline-block' : 'none';
+                    if (isVisible) visibleBranchesCount++;
                 }
                 tag.classList.toggle('active-filter', isActive);
                 // PALETTE: Sync ARIA state
@@ -633,18 +640,36 @@ template = '''
 
             if (query === '') {
                 resultsCount.textContent = '';
+                document.querySelectorAll('.match-count').forEach(el => el.textContent = '');
             } else {
                 resultsCount.textContent = `Showing ${visibleRowsCount} matching conflict${visibleRowsCount !== 1 ? 's' : ''}`;
+                // PALETTE: Update section-level match counts
+                const branchMatchEl = document.querySelector('#branches-section .match-count');
+                if (branchMatchEl) branchMatchEl.textContent = `(${visibleBranchesCount} match${visibleBranchesCount !== 1 ? 'es' : ''})`;
+                const conflictMatchEl = document.querySelector('#conflicts-section .match-count');
+                if (conflictMatchEl) conflictMatchEl.textContent = `(${visibleRowsCount} match${visibleRowsCount !== 1 ? 'es' : ''})`;
             }
 
             if (table) {
                 table.style.display = visibleRowsCount > 0 ? '' : 'none';
             }
+
+            // PALETTE: Hide headings if no matches in their respective sections
+            const branchesSection = document.getElementById('branches-section');
+            if (branchesSection) {
+                const showBranches = visibleBranchesCount > 0 || query === '';
+                branchesSection.style.display = showBranches ? '' : 'none';
+                const branchesList = document.getElementById('monitored-branches-list');
+                if (branchesList) branchesList.style.display = showBranches ? '' : 'none';
+            }
+            const conflictsSection = document.getElementById('conflicts-section');
+            if (conflictsSection) {
+                const showConflicts = visibleRowsCount > 0 || query === '';
+                conflictsSection.style.display = showConflicts ? '' : 'none';
+            }
+
             // PALETTE: Check monitored branches list as well for "No results"
-            let anyMonitoredVisible = false;
-            document.querySelectorAll('#monitored-branches-list .branch-tag').forEach(tag => {
-                if (tag.style.display !== 'none') anyMonitoredVisible = true;
-            });
+            let anyMonitoredVisible = visibleBranchesCount > 0;
             noResults.style.display = ((visibleRowsCount === 0 && !anyMonitoredVisible) && query !== '') ? 'block' : 'none';
             updatePageTitle(visibleRowsCount);
         });
