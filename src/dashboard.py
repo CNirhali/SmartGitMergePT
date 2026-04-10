@@ -180,6 +180,7 @@ template = '''
         .scenario-types li.highlight-secondary { border-color: #0969da; background-color: #f3f4f6; }
         .scenario-types li strong { font-size: 1.1em; margin-bottom: 4px; display: block; }
         .scenario-types li .scenario-desc { font-size: 0.85em; color: #57606a; }
+        .dimmed { opacity: 0.5; filter: grayscale(50%); transition: opacity 0.2s, filter 0.2s; }
         @media (max-width: 600px) {
             body { margin: 1em; }
             .summary { flex-direction: column; }
@@ -585,6 +586,9 @@ template = '''
 
             let visibleRowsCount = 0;
             const visibleBranchesInTable = new Set();
+            const liveScenarioCounts = { file_overlap: 0, line_overlap: 0, semantic_conflict: 0 };
+            const liveBranchConflictCounts = {};
+
             if (query) {
                 clearFilterBtn.classList.add('visible');
             } else {
@@ -594,7 +598,7 @@ template = '''
             // PALETTE: Capture rows within the handler for robustness against DOM changes
             const currentTableRows = document.querySelectorAll('tbody tr');
 
-            // PALETTE: First pass - determine visible rows and collect branches from them
+            // PALETTE: First pass - determine visible rows and collect branches/scenarios from them
             currentTableRows.forEach(row => {
                 const text = row.textContent.toLowerCase();
                 // PALETTE: AND filtering - all terms must match
@@ -602,8 +606,20 @@ template = '''
                 row.style.display = isVisible ? '' : 'none';
                 if (isVisible) {
                     visibleRowsCount++;
-                    visibleBranchesInTable.add(row.getAttribute('data-branch-a'));
-                    visibleBranchesInTable.add(row.getAttribute('data-branch-b'));
+                    const bA = row.getAttribute('data-branch-a');
+                    const bB = row.getAttribute('data-branch-b');
+                    visibleBranchesInTable.add(bA);
+                    visibleBranchesInTable.add(bB);
+
+                    // PALETTE: Track live conflict counts for branches
+                    liveBranchConflictCounts[bA] = (liveBranchConflictCounts[bA] || 0) + 1;
+                    liveBranchConflictCounts[bB] = (liveBranchConflictCounts[bB] || 0) + 1;
+
+                    // PALETTE: Track live counts for scenario types
+                    const rowScenarios = (row.getAttribute('data-scenarios') || '').split(' ');
+                    rowScenarios.forEach(s => {
+                        if (s.trim()) liveScenarioCounts[s.trim()]++;
+                    });
                 }
             });
 
@@ -624,6 +640,14 @@ template = '''
                     const parentLi = tag.closest('li');
                     if (parentLi) parentLi.style.display = isVisible ? 'inline-block' : 'none';
                     if (isVisible) visibleBranchesCount++;
+
+                    // PALETTE: Update live conflict count badges
+                    const countSpan = tag.querySelector('.conflict-count');
+                    if (countSpan) {
+                        const newCount = liveBranchConflictCounts[branchName] || 0;
+                        countSpan.textContent = newCount;
+                        countSpan.style.display = newCount > 0 ? 'inline-block' : 'none';
+                    }
                 }
                 tag.classList.toggle('active-filter', isActive);
                 // PALETTE: Sync ARIA state
@@ -636,6 +660,23 @@ template = '''
                 el.classList.toggle('active-filter', isActive);
                 // PALETTE: Sync ARIA state
                 el.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+
+                // PALETTE: Update live scenario counts and dimming
+                const scenario = el.getAttribute('data-scenario');
+                if (scenario && el.tagName === 'LI') {
+                    const liveCount = liveScenarioCounts[scenario] || 0;
+                    const badge = el.querySelector('.badge');
+                    if (badge) {
+                        if (liveCount > 0) {
+                            badge.textContent = `⚠️ ${liveCount}`;
+                            badge.className = 'badge badge-error';
+                        } else {
+                            badge.textContent = '✅ Clear';
+                            badge.className = 'badge badge-success';
+                        }
+                    }
+                    el.classList.toggle('dimmed', query !== '' && liveCount === 0);
+                }
             });
 
             if (query === '') {
@@ -831,7 +872,7 @@ def dashboard():
         if pred.get('line_conflicts'): scenarios.append("Line Overlap")
         if pred.get('semantic_conflict'): scenarios.append("Semantic Conflict")
         scenarios_str = f" ({', '.join(scenarios)})" if scenarios else ""
-        conflicts_summary_list.append(f"{b1} <-> {b2}: {files}{scenarios_str}")
+        conflicts_summary_list.append(f"- [ ] {b1} <-> {b2}: {files}{scenarios_str}")
     conflicts_summary = "\n".join(conflicts_summary_list) if conflicts_summary_list else "No conflicts detected."
 
     scenario_types = {
